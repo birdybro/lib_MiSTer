@@ -1,0 +1,8 @@
+# >vsim work.Xbench_00 < vsim.txt
+# Returns 0 for successful run,
+#         1 for an assertion warning,
+#         2 for an assertion error,
+#         3 for an assertion failure
+run -all
+quit -code [coverage attribute -name TESTSTATUS -concise]
+
