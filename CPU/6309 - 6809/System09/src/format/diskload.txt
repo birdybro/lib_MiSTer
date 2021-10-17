@@ -1,0 +1,479 @@
+***************************************************
+*
+* ACIA_IO
+* Interrupt driven ACIA driver
+*
+***************************************************
+*
+IO	EQU	$E000
+RAM	EQU	$DFC0
+ROM 	EQU	$F800
+*
+*
+MONITOR	EQU	ROM+0
+IRQVEC	EQU	RAM+8
+ACIACS	EQU	IO+8
+ACIADA	EQU	IO+9
+RXFULL	EQU	$01
+TXEMPTY	EQU	$02
+RXIENB	EQU	$80
+TXIENB	EQU	$20
+ACIRQ	EQU	$80
+*
+IFLAG	EQU	$10
+*
+*
+*
+	ORG	$0100
+START	LBRA	LOOP
+ACMASK	FCB	$11
+IRQSAV  FDB     0
+*
+* Receive Buffer
+*
+RXBLEN	EQU	8192
+RXIPTR	FDB	RXBUFF
+RXOPTR	FDB	RXBUFF
+RXCNT	FDB	0
+RXBUFF	RMB	RXBLEN
+*
+* Transmit Buffer
+*
+TXBLEN	EQU	16
+TXIPTR	FDB	TXBUFF
+TXOPTR	FDB	TXBUFF
+TXCNT	FDB	0
+TXBUFF	RMB	TXBLEN
+*
+* CF Data
+*
+MTKSIR	EQU	38	; Max Track SIR offset
+MSCSIR	EQU	39	; Max Sector SIR offset
+DRVNUM	FCB	0	; Drive Number
+TRKNUM	FCB	0	; Track Number
+SECNUM	FCB	0	; Sector Number
+MAXTRK	FCB	0	; MAXIMUM TRACK (FROM SIR)
+MAXSEC	FCB	1	; MAXIMUM SECTOR (FROM SIR)
+SECBUF	RMB	256	; SECTOR BUFFER
+*
+* Initialize ACIA Driver
+*
+ACINIT	EQU	*
+	PSHS	A,X
+	ORCC	#IFLAG
+        LDX     IRQVEC
+        STX     IRQSAV
+	LDX	#ACIJMP
+	STX	IRQVEC
+*
+	LDX	#RXBUFF
+	STX	RXIPTR
+	STX	RXOPTR
+        LDX     #$0000
+	STX	RXCNT
+*
+	LDX	#TXBUFF
+	STX	TXIPTR
+	STX	TXOPTR
+        LDX     #$0000
+	STX	TXCNT
+*
+	LDA	#$03	; reset ACIA
+	STA	ACIACS
+	LDA	ACMASK
+	STA	ACIACS
+	LDA	ACIADA
+*
+	LDA	ACMASK	; Enable RX Interrupts
+	ORA	#RXIENB
+	STA	ACMASK
+	STA	ACIACS
+*
+	ANDCC	#$FF-IFLAG
+	PULS	A,X,PC
+*
+*
+* ACIA INTERRUPT
+*
+*
+* Get Character from RX buffer
+* Entry: None
+* Exit:  Z=1 if buffer empty 
+* 	 ACCA = Character
+*
+RXGETC	PSHS	B,X	; Save registers
+	ORCC	#IFLAG	; Mask ACIA IRQs
+*
+	LDX	RXCNT	; Anything in buffer ?
+	BEQ	RXGETC2	; No, exit with Z flag set
+	LEAX    -1,X	; One less character in buffer
+	STX	RXCNT
+*
+	LDX	RXOPTR	; Point to next byte in buffer
+	LDA	,X+	; fetch it
+	CMPX	#RXBUFF+RXBLEN	; Reached end of buffer ?
+	BNE	RXGETC1	; No, store pointer
+	LDX	#RXBUFF	; Yes, wrap to start of buffer
+RXGETC1	STX	RXOPTR	; Update pointer
+*
+RXGETC2	ANDCC	#$FF-IFLAG ; Enable interrupts
+	PULS	B,X,PC	; restore registers and return
+*
+* Put Character in TX buffer
+* Entry: ACCA = Character
+* Exit:  Z=1 if buffer full
+*
+TXPUTC	PSHS	B,X	; Save registers
+	ORCC	#IFLAG	; Mask ACIA IRQs
+*
+	LDB	ACMASK	; Test if TX interrupt enabled
+	BITB	#TXIENB
+	BNE	TXPUTC1	; Yes, put character in output buffer
+	ORB	#TXIENB	; no, Enable TX interrupt
+	STB	ACMASK
+	STB	ACIACS
+	STA	ACIADA	; output character directly to ACIA
+	BRA	TXPUTC3	; exit
+*
+TXPUTC1	LDX	TXCNT	; Test if buffer full
+	CMPX	#TXBLEN
+	BEQ	TXPUTC3	; Buffer full, exit with Carry set
+	LEAX    1,X	; Buffer not full, bump byte count
+	STX	TXCNT
+*
+	LDX	TXIPTR	; Pointer to buffer input
+	STA	,X+	; Store charcater in buffer
+	CMPX	#TXBUFF+TXBLEN ; Need to wrap buffer pointer ?
+	BNE	TXPUTC2	; no, update pointer
+	LDX	#TXBUFF	; yes, point to start of buffer
+TXPUTC2	STX	TXIPTR
+TXPUTC3	ANDCC	#$FF-IFLAG ; Clear interrupt mask
+	PULS	B,X,PC	; restore registers and exit
+*
+* ACIA Interrupt service routine
+*
+ACIJMP	EQU	*
+	LDA	ACIACS	; Fetch ACIA status
+	BITA	#$ACIRQ ; Interrupt from ACIA ?
+	BEQ	ACIJMPX ; no, exit
+*
+	BITA	#RXFULL ; receive interrupts ?
+	BNE	ACIJRX	; yes, go service
+ACIJMP1	BITA	#TXEMPTY ; transmit interrupt ?
+	BNE	ACIJTX	; yes, go service
+*
+ACIJMPX	RTI		; return from interrupt
+*
+* Character Receiver, put in RX input buffer
+*
+ACIJRX	LDA	ACIADA	; Get character from ACIA
+*
+	LDX	RXCNT
+	CMPX	#RXBLEN	; Is input buffer full ?
+	BEQ	ACIJRX2	; yes, test for TX interrupt before exiting
+	LEAX    1,X
+	STX	RXCNT	; Update Buffer byte count
+*
+	LDX	RXIPTR	; Point to RX input pionter
+	STA	,X+	; Store character in buffer
+	CMPX	#RXBUFF+RXBLEN ; Reached end of buffer
+	BNE	ACIJRX1 ; no, update pointer
+	LDX	#RXBUFF ; yes, wrap around to start of buffer
+ACIJRX1	STX	RXIPTR
+*
+ACIJRX2 LDA	ACIACS	; Fetch ACIA status
+	BRA	ACIJMP1	; test for TX interrupt before exiting
+*
+* Character Transmitter, get next from buffer
+*
+ACIJTX	LDX	TXCNT	; Any more characters to output ?
+	BNE	ACIJTX1	; yes, fetch from tx buffer
+*
+	LDB	ACMASK	; No, mask TX interrupt
+	ANDB	#$FF-TXIENB
+	STB	ACMASK
+	STB	ACIACS
+	BRA	ACIJMPX	; Exit interrupt routine
+*
+ACIJTX1 LEAX    -1,X 
+	STX	TXCNT	; One less character in buffer
+*
+	LDX	TXOPTR	; Point to next output character
+	LDA	,X+	; fetch byte
+	CMPX	#TXBUFF+TXBLEN	; Reached end of buffer ?
+	BNE	ACIJTX2	; no, update pointer
+	LDX	#TXBUFF	; yes, wrap to start of buffer
+ACIJTX2	STX	TXOPTR	; Store pointer
+*
+	STA	ACIADA	; Ouput Character to ACIA
+	BRA	ACIJMPX	; return from interrupt
+*
+** FLEX 9 COMPACT FLASH DISK DRIVERS
+*
+* FOR SYS09BUG 1.2 ON THE BURCHED B5-X300
+* WITH I/O MAPPED AT $XE000
+* AND ROM MAPPED AT $XF000
+* THE BURCHED B5-X300 HAS 256KBYTES OF SRAM
+* THE FIRST 64K IS USED BY FLEX,
+* THE SECOND 192K MAY BE USED AS A RAM DISK
+*
+*
+IMASK  EQU $10     IRQ MASK CC
+FMASK  EQU $40     FIRQ MASK CC
+DATREG EQU $FFF0   DAT REGISTERS
+*
+CF_BASE    EQU $E040
+CF_DATA    EQU CF_BASE+0
+CF_ERROR   EQU CF_BASE+1 ; read error
+CF_FEATURE EQU CF_BASE+1 ; write feature
+CF_SECCNT  EQU CF_BASE+2
+CF_SECNUM  EQU CF_BASE+3
+CF_CYLLO   EQU CF_BASE+4
+CF_CYLHI   EQU CF_BASE+5
+CF_HEAD    EQU CF_BASE+6
+CF_STATUS  EQU CF_BASE+7 ; read status
+CF_COMAND  EQU CF_BASE+7 ; write command
+*
+* Command Equates
+*
+CMDREAD    EQU $20 ; Read Single sector
+CMDWRITE   EQU $30 ; Write Single sector
+CMDFEATURE EQU $EF
+FEAT8BIT   EQU $01 ; enable 8 bit transfers
+HEADLBA    EQU $E0
+*
+* Status bit equates
+*
+BSY        EQU $80
+DRDY       EQU $40
+DRQ        EQU $08
+ERR        EQU $01
+*
+*
+* INITIALIZE CF CARD FOR 8 BIT LBA MODE
+*
+INITDR JSR WAITRDY
+       LDA #HEADLBA
+       STA CF_HEAD
+       JSR WAITRDY
+       LDA #FEAT8BIT
+       STA CF_FEATURE
+       LDA #CMDFEATURE
+       STA CF_COMAND
+       JSR WAITRDY
+WARMD1 RTS
+*  
+* WRITE SECTOR TO CF
+*  
+WRITE  PSHS X
+       LDA  #$01
+       STA  CF_SECCNT
+       LDA  SECNUM
+       STA  CF_SECNUM
+       LDA  TRKNUM
+       STA  CF_CYLLO
+       LDA  DRVNUM
+       STA  CF_CYLHI
+*
+       LDA  #CMDWRITE; IDE WRITE MULTIPLE
+       STA  CF_COMAND
+       JSR  WAITRDY
+*
+* WRITE LOOP
+*
+       CLRB
+WRTLP1 JSR  WAITDRQ
+       LDA  ,X+
+       STA  CF_DATA
+       DECB
+       BNE  WRTLP1
+*
+       CLRB
+WRTLP2 JSR  WAITDRQ
+       CLRA
+       STA  CF_DATA
+       DECB
+       BNE WRTLP2
+*
+       JSR WAITRDY
+       CLRB
+       PULS  X,PC
+*
+* WAIT UNTIL READY
+*
+WAITRDY LDA  CF_STATUS
+        BITA #BSY
+        BNE  WAITRDY
+        LDA  CF_STATUS
+        BITA #DRDY
+        BEQ  WAITRDY
+        RTS
+*
+* WAIT FOR DATA REQUEST
+*
+WAITDRQ LDA  CF_STATUS
+        BITA #DRQ
+        BEQ  WAITDRQ
+        RTS
+*
+* PRINT DATA STRING
+*
+PDATA1  LBSR TXPUTC
+        BEQ  PDATA1
+PDATA   LDA  ,X+
+        CMPA #$04
+        BNE  PDATA1
+        RTS
+* 
+***** INPUT BYTE (2 HEX CHAR.) ***** 
+* 
+BYTE   BSR INHEX GET HEX LEFT 
+       BVS NOTHEX EXIT IF NOT VALID HEX 
+       ASLA   ;
+       ASLA   ;
+       ASLA   ; SHIFT INTO LEFT NIBBLE
+       ASLA   ;
+       TFR  A,B PUT HEXL IN "B" 
+       BSR INHEX GET HEX RIGHT 
+       BVS NOTHEX EXIT IF NOT VALID HEX 
+       PSHS B PUSH HEXL ON STACK 
+       ADDA ,S+ ADD HEXL TO HEXR AND ADJ. STK 
+       RTS  RETURN WITH HEX L&R IN "A" 
+* 
+* 
+INHEX  LBSR	RXGETC
+       BEQ	INHEX
+       CMPA #'0 IS IT > OR = "0" ? 
+       BCS NOTHEX IF LESS IT AIN'T HEX 
+       CMPA #'9 IS IT < OR = "9" ? 
+       BHI INHEXA IF > MAYBE IT'S ALPHA 
+       SUBA #$30 ASCII ADJ. NUMERIC 
+       RTS  ;
+* 
+* 
+INHEXA CMPA #'A IS IT > OR = "A" 
+       BCS NOTHEX IF LESS IT AIN'T HEX 
+       CMPA #'F IS IT < OR = "F" ? 
+       BHI INHEXL IF > IT AIN'T HEX 
+       SUBA #$37 ASCII ADJ. ALPHA 
+       RTS  ;
+* 
+INHEXL CMPA #'a IS IT > OR = "a" 
+       BCS NOTHEX IF LESS IT AIN'T HEX 
+       CMPA #'f IS IT < "f" 
+       BHI NOTHEX IF > IT AIN'T HEX 
+       SUBA #$57 ADJUST TO LOWER CASE 
+       RTS  ;
+* 
+* 
+NOTHEX ORCC #2 SET (V) FLAG IN C-CODES REGISTER 
+       RTS  ;
+*
+* READ SECTOR FROM ACIA
+*
+READ	LDX	#SECBUF
+	CLR	,-S
+READ1	LBSR	BYTE	
+	BVS	READ1
+	STA	,X+
+	DEC	,S
+	BNE	READ1
+	LDX	#SECBUF
+	PULS	B,PC
+*
+**********************************************************
+*
+* Main line loop
+*
+**********************************************************
+LOOP	LBSR	ACINIT	; Initialise ACIA and Buffers
+	LBSR	INITDR	; Initialise CF
+        LDX	#DRVMSG	; Prompt for Drive number
+	LBSR	PDATA
+*
+LOOP1	LBSR	RXGETC	; get drive number
+	BEQ	LOOP1
+	CMPA	#'X'
+	LBEQ	EXIT
+	CMPA	#'0'    ; DRIVE 0 to 3
+	BLO	LOOP1
+        CMPA	#'3'
+	BHI	LOOP1
+LOOP1A	LBSR	TXPUTC	; Echo character
+        BEQ	LOOP1A
+	SUBA	#'0'
+	STA	DRVNUM	; Set up drive number
+*
+* Read Sector 1 (Boot Sector)
+*
+	LDA	#0	; Track 0
+	STA	TRKNUM
+	LDB	#0	; Sector 1
+	STB	SECNUM
+	LBSR	READ	; Read first sector from serial Port
+	LBSR	WRITE	; Write Sector to CF
+*
+* Read Sector 2	(Boot Sector)
+*
+	INC	SECNUM
+	LBSR	READ	; Read Second sector from serial Port
+	LBSR	WRITE	; Write Sector to CF
+*
+* Read Sector 3	(SIR Sector)
+*
+	INC	SECNUM
+	LBSR	READ	; Read System Information Record
+	LDA	38,X
+	STA	MAXTRK
+	LDB	39,X
+	DECB
+	STB	MAXSEC
+	LBSR	WRITE	; Write Sector to CF
+*
+* Read and Write Remaining Sectors
+*
+LOOP2	LDA	TRKNUM
+	LDB	SECNUM
+*
+	CMPB	MAXSEC
+	BEQ	LOOP3
+	INCB
+	BRA	LOOP4
+*
+LOOP3	CLRB
+	CMPA	MAXTRK
+	BEQ	EXIT
+	INCA
+*
+LOOP4	STA	TRKNUM
+	STB	SECNUM
+*
+	LBSR	READ
+	LBSR	WRITE
+        BRA     LOOP2
+*
+* Disable ACIA interrupts
+*
+EXIT    ORCC    #IFLAG
+	LDA	ACMASK	; Enable RX Interrupts
+	ANDA	#$FF-RXIENB-TXIENB
+	STA	ACMASK
+	STA	ACIACS
+*
+* Restore IRQ vector
+*
+        LDX     IRQSAV
+        STX     IRQVEC
+        ANDCC   #$FF-IFLAG
+	JMP	[MONITOR]
+*
+* STRINGS
+*
+DRVMSG	FCB	$0D,$0A
+	FCC	"CF Drive Loader Routine"
+	FCB	$0D,$0A
+	FCC	"Drive Number to be loaded (0-3) ?"
+	FCB	$04
+*
+        END
+

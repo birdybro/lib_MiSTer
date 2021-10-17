@@ -1,0 +1,226 @@
+***************************************************
+*
+* ACIA_IO
+* Interrupt driven ACIA driver
+*
+***************************************************
+*
+IO	EQU	$E000
+RAM	EQU	$DFC0
+ROM 	EQU	$F800
+*
+*
+MONITOR	EQU	ROM+0
+IRQVEC	EQU	RAM+8
+ACIACS	EQU	IO+8
+ACIADA	EQU	IO+9
+RXFULL	EQU	$01
+TXEMPTY	EQU	$02
+RXIENB	EQU	$80
+TXIENB	EQU	$20
+ACIRQ	EQU	$80
+*
+IFLAG	EQU	$10
+*
+*
+*
+	ORG	$0100
+START	LBRA	LOOP
+ACMASK	FCB	$11
+IRQSAV  FDB     0
+*
+* Receive Buffer
+*
+RXBLEN	EQU	8192
+RXIPTR	FDB	RXBUFF
+RXOPTR	FDB	RXBUFF
+RXCNT	FDB	0
+RXBUFF	RMB	RXBLEN
+*
+* Transmit Buffer
+*
+TXBLEN	EQU	16
+TXIPTR	FDB	TXBUFF
+TXOPTR	FDB	TXBUFF
+TXCNT	FDB	0
+TXBUFF	RMB	TXBLEN
+*
+* Initialize ACIA Driver
+*
+ACINIT	EQU	*
+	PSHS	A,X
+	ORCC	#IFLAG
+        LDX     IRQVEC
+        STX     IRQSAV
+	LDX	#ACIJMP
+	STX	IRQVEC
+*
+	LDX	#RXBUFF
+	STX	RXIPTR
+	STX	RXOPTR
+        LDX     #$0000
+	STX	RXCNT
+*
+	LDX	#TXBUFF
+	STX	TXIPTR
+	STX	TXOPTR
+        LDX     #$0000
+	STX	TXCNT
+*
+	LDA	#$03	; reset ACIA
+	STA	ACIACS
+	LDA	ACMASK
+	STA	ACIACS
+	LDA	ACIADA
+*
+	LDA	ACMASK	; Enable RX Interrupts
+	ORA	#RXIENB
+	STA	ACMASK
+	STA	ACIACS
+*
+	ANDCC	#$FF-IFLAG
+	PULS	A,X,PC
+*
+*
+* ACIA INTERRUPT
+*
+*
+* Get Character from RX buffer
+* Entry: None
+* Exit:  Z=1 if buffer empty 
+* 	 ACCA = Character
+*
+RXGETC	PSHS	B,X	; Save registers
+	ORCC	#IFLAG	; Mask ACIA IRQs
+*
+	LDX	RXCNT	; Anything in buffer ?
+	BEQ	RXGETC2	; No, exit with Z flag set
+	LEAX    -1,X	; One less character in buffer
+	STX	RXCNT
+*
+	LDX	RXOPTR	; Point to next byte in buffer
+	LDA	,X+	; fetch it
+	CMPX	#RXBUFF+RXBLEN	; Reached end of buffer ?
+	BNE	RXGETC1	; No, store pointer
+	LDX	#RXBUFF	; Yes, wrap to start of buffer
+RXGETC1	STX	RXOPTR	; Update pointer
+*
+RXGETC2	ANDCC	#$FF-IFLAG ; Enable interrupts
+	PULS	B,X,PC	; restore registers and return
+*
+* Put Character in TX buffer
+* Entry: ACCA = Character
+* Exit:  Z=1 if buffer full
+*
+TXPUTC	PSHS	B,X	; Save registers
+	ORCC	#IFLAG	; Mask ACIA IRQs
+*
+	LDB	ACMASK	; Test if TX interrupt enabled
+	BITB	#TXIENB
+	BNE	TXPUTC1	; Yes, put character in output buffer
+	ORB	#TXIENB	; no, Enable TX interrupt
+	STB	ACMASK
+	STB	ACIACS
+	STA	ACIADA	; output character directly to ACIA
+	BRA	TXPUTC3	; exit
+*
+TXPUTC1	LDX	TXCNT	; Test if buffer full
+	CMPX	#TXBLEN
+	BEQ	TXPUTC3	; Buffer full, exit with Carry set
+	LEAX    1,X	; Buffer not full, bump byte count
+	STX	TXCNT
+*
+	LDX	TXIPTR	; Pointer to buffer input
+	STA	,X+	; Store charcater in buffer
+	CMPX	#TXBUFF+TXBLEN ; Need to wrap buffer pointer ?
+	BNE	TXPUTC2	; no, update pointer
+	LDX	#TXBUFF	; yes, point to start of buffer
+TXPUTC2	STX	TXIPTR
+TXPUTC3	ANDCC	#$FF-IFLAG ; Clear interrupt mask
+	PULS	B,X,PC	; restore registers and exit
+*
+* ACIA Interrupt service routine
+*
+ACIJMP	EQU	*
+	LDA	ACIACS	; Fetch ACIA status
+	BITA	#$ACIRQ ; Interrupt from ACIA ?
+	BEQ	ACIJMPX ; no, exit
+*
+	BITA	#RXFULL ; receive interrupts ?
+	BNE	ACIJRX	; yes, go service
+ACIJMP1	BITA	#TXEMPTY ; transmit interrupt ?
+	BNE	ACIJTX	; yes, go service
+*
+ACIJMPX	RTI		; return from interrupt
+*
+* Character Receiver, put in RX input buffer
+*
+ACIJRX	LDA	ACIADA	; Get character from ACIA
+*
+	LDX	RXCNT
+	CMPX	#RXBLEN	; Is input buffer full ?
+	BEQ	ACIJRX2	; yes, test for TX interrupt before exiting
+	LEAX    1,X
+	STX	RXCNT	; Update Buffer byte count
+*
+	LDX	RXIPTR	; Point to RX input pionter
+	STA	,X+	; Store character in buffer
+	CMPX	#RXBUFF+RXBLEN ; Reached end of buffer
+	BNE	ACIJRX1 ; no, update pointer
+	LDX	#RXBUFF ; yes, wrap around to start of buffer
+ACIJRX1	STX	RXIPTR
+*
+ACIJRX2 LDA	ACIACS	; Fetch ACIA status
+	BRA	ACIJMP1	; test for TX interrupt before exiting
+*
+* Character Transmitter, get next from buffer
+*
+ACIJTX	LDX	TXCNT	; Any more characters to output ?
+	BNE	ACIJTX1	; yes, fetch from tx buffer
+*
+	LDB	ACMASK	; No, mask TX interrupt
+	ANDB	#$FF-TXIENB
+	STB	ACMASK
+	STB	ACIACS
+	BRA	ACIJMPX	; Exit interrupt routine
+*
+ACIJTX1 LEAX    -1,X 
+	STX	TXCNT	; One less character in buffer
+*
+	LDX	TXOPTR	; Point to next output character
+	LDA	,X+	; fetch byte
+	CMPX	#TXBUFF+TXBLEN	; Reached end of buffer ?
+	BNE	ACIJTX2	; no, update pointer
+	LDX	#TXBUFF	; yes, wrap to start of buffer
+ACIJTX2	STX	TXOPTR	; Store pointer
+*
+	STA	ACIADA	; Ouput Character to ACIA
+	BRA	ACIJMPX	; return from interrupt
+*
+* Main line loop
+*
+LOOP	LBSR	ACINIT	; Initialise ACIA and Buffers
+LOOP1	LBSR	RXGETC	; Get character
+	BEQ	LOOP1
+	CMPA	#$1A    ; Ctrl Z exits
+	BEQ	EXIT
+	LBSR	TXPUTC	; Echo character
+        BRA     LOOP1
+*
+* Disable ACIA interrupts
+*
+EXIT    ORCC    #IFLAG
+	LDA	ACMASK	; Enable RX Interrupts
+	ANDA	#$FF-RXIENB-TXIENB
+	STA	ACMASK
+	STA	ACIACS
+*
+* Restore IRQ vector
+*
+        LDX     IRQSAV
+        STX     IRQVEC
+        ANDCC   #$FF-IFLAG
+	JMP	[MONITOR]
+*
+        END
+

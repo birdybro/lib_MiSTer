@@ -1,0 +1,17 @@
+PROMGEN: Xilinx Prom Generator H.42
+Copyright (c) 1995-2005 Xilinx, Inc.  All rights reserved.
+
+promgen -w -p exo -c FF -o c:\vhdl\system09\rtl\system09_xess_xsa-3s1000//Sys09_XSA3S1000.exo -u 0 C:\Vhdl\System09\rtl\System09_Xess_XSA-3S1000\my_system09.bit -s 512 
+
+PROM c:\vhdl\system09\rtl\system09_xess_xsa-3s1000//Sys09_XSA3S1000.prm map: Mon Jul 02 01:19:04 2007
+
+Calculating PROM checksum with fill value ff
+
+Format        Exormax
+Size          512K
+PROM start    00000000
+PROM end      0007ffff
+PROM checksum 0255e2ed
+
+        Addr1        Addr2 File(s)
+     00000000     000625f7 C:/Vhdl/System09/rtl/System09_Xess_XSA-3S1000/my_system09.bit

@@ -1,0 +1,491 @@
+Assembler release DWC_2.0 version 2.11
+May 6, 2004 (c) Motorola (free ware)
+0001                         ***************************************************
+0002                         *
+0003                         * ACIA_IO
+0004                         * Interrupt driven ACIA driver
+0005                         *
+0006                         ***************************************************
+0007                         *
+0008 E000                    IO	EQU	$E000
+0009 DFC0                    RAM	EQU	$DFC0
+0010 F800                    ROM 	EQU	$F800
+0011                         *
+0012                         *
+0013 F800                    MONITOR	EQU	ROM+0
+0014 DFC8                    IRQVEC	EQU	RAM+8
+0015 E008                    ACIACS	EQU	IO+8
+0016 E009                    ACIADA	EQU	IO+9
+0017 0001                    RXFULL	EQU	$01
+0018 0002                    TXEMPTY	EQU	$02
+0019 0080                    RXIENB	EQU	$80
+0020 0020                    TXIENB	EQU	$20
+0021 0080                    ACIRQ	EQU	$80
+0022                         *
+0023 0010                    IFLAG	EQU	$10
+0024                         *
+0025                         *
+0026                         *
+0027 0100                    	ORG	$0100
+0028 0100 16 22 F6           START	LBRA	LOOP
+0029 0103 11                 ACMASK	FCB	$11
+0030 0104 00 00              IRQSAV  FDB     0
+0031                         *
+0032                         * Receive Buffer
+0033                         *
+0034 2000                    RXBLEN	EQU	8192
+0035 0106 01 0C              RXIPTR	FDB	RXBUFF
+0036 0108 01 0C              RXOPTR	FDB	RXBUFF
+0037 010A 00 00              RXCNT	FDB	0
+0038 010C                    RXBUFF	RMB	RXBLEN
+0039                         *
+0040                         * Transmit Buffer
+0041                         *
+0042 0010                    TXBLEN	EQU	16
+0043 210C 21 12              TXIPTR	FDB	TXBUFF
+0044 210E 21 12              TXOPTR	FDB	TXBUFF
+0045 2110 00 00              TXCNT	FDB	0
+0046 2112                    TXBUFF	RMB	TXBLEN
+0047                         *
+0048                         * CF Data
+0049                         *
+0050 0026                    MTKSIR	EQU	38	; Max Track SIR offset
+0051 0027                    MSCSIR	EQU	39	; Max Sector SIR offset
+0052 2122 00                 DRVNUM	FCB	0	; Drive Number
+0053 2123 00                 TRKNUM	FCB	0	; Track Number
+0054 2124 00                 SECNUM	FCB	0	; Sector Number
+0055 2125 00                 MAXTRK	FCB	0	; MAXIMUM TRACK (FROM SIR)
+0056 2126 01                 MAXSEC	FCB	1	; MAXIMUM SECTOR (FROM SIR)
+0057 2127                    SECBUF	RMB	256	; SECTOR BUFFER
+0058                         *
+0059                         * Initialize ACIA Driver
+0060                         *
+0061 2227                    ACINIT	EQU	*
+0062 2227 34 12              	PSHS	A,X
+0063 2229 1A 10              	ORCC	#IFLAG
+0064 222B BE DF C8                   LDX     IRQVEC
+0065 222E BF 01 04                   STX     IRQSAV
+0066 2231 8E 22 CD           	LDX	#ACIJMP
+0067 2234 BF DF C8           	STX	IRQVEC
+0068                         *
+0069 2237 8E 01 0C           	LDX	#RXBUFF
+0070 223A BF 01 06           	STX	RXIPTR
+0071 223D BF 01 08           	STX	RXOPTR
+0072 2240 8E 00 00                   LDX     #$0000
+0073 2243 BF 01 0A           	STX	RXCNT
+0074                         *
+0075 2246 8E 21 12           	LDX	#TXBUFF
+0076 2249 BF 21 0C           	STX	TXIPTR
+0077 224C BF 21 0E           	STX	TXOPTR
+0078 224F 8E 00 00                   LDX     #$0000
+0079 2252 BF 21 10           	STX	TXCNT
+0080                         *
+0081 2255 86 03              	LDA	#$03	; reset ACIA
+0082 2257 B7 E0 08           	STA	ACIACS
+0083 225A B6 01 03           	LDA	ACMASK
+0084 225D B7 E0 08           	STA	ACIACS
+0085 2260 B6 E0 09           	LDA	ACIADA
+0086                         *
+0087 2263 B6 01 03           	LDA	ACMASK	; Enable RX Interrupts
+0088 2266 8A 80              	ORA	#RXIENB
+0089 2268 B7 01 03           	STA	ACMASK
+0090 226B B7 E0 08           	STA	ACIACS
+0091                         *
+0092 226E 1C EF              	ANDCC	#$FF-IFLAG
+0093 2270 35 92              	PULS	A,X,PC
+0094                         *
+0095                         *
+0096                         * ACIA INTERRUPT
+0097                         *
+0098                         *
+0099                         * Get Character from RX buffer
+0100                         * Entry: None
+0101                         * Exit:  Z=1 if buffer empty 
+0102                         * 	 ACCA = Character
+0103                         *
+0104 2272 34 14              RXGETC	PSHS	B,X	; Save registers
+0105 2274 1A 10              	ORCC	#IFLAG	; Mask ACIA IRQs
+0106                         *
+0107 2276 BE 01 0A           	LDX	RXCNT	; Anything in buffer ?
+0108 2279 27 15              	BEQ	RXGETC2	; No, exit with Z flag set
+0109 227B 30 1F              	LEAX    -1,X	; One less character in buffer
+0110 227D BF 01 0A           	STX	RXCNT
+0111                         *
+0112 2280 BE 01 08           	LDX	RXOPTR	; Point to next byte in buffer
+0113 2283 A6 80              	LDA	,X+	; fetch it
+0114 2285 8C 21 0C           	CMPX	#RXBUFF+RXBLEN	; Reached end of buffer ?
+0115 2288 26 03              	BNE	RXGETC1	; No, store pointer
+0116 228A 8E 01 0C           	LDX	#RXBUFF	; Yes, wrap to start of buffer
+0117 228D BF 01 08           RXGETC1	STX	RXOPTR	; Update pointer
+0118                         *
+0119 2290 1C EF              RXGETC2	ANDCC	#$FF-IFLAG ; Enable interrupts
+0120 2292 35 94              	PULS	B,X,PC	; restore registers and return
+0121                         *
+0122                         * Put Character in TX buffer
+0123                         * Entry: ACCA = Character
+0124                         * Exit:  Z=1 if buffer full
+0125                         *
+0126 2294 34 14              TXPUTC	PSHS	B,X	; Save registers
+0127 2296 1A 10              	ORCC	#IFLAG	; Mask ACIA IRQs
+0128                         *
+0129 2298 F6 01 03           	LDB	ACMASK	; Test if TX interrupt enabled
+0130 229B C5 20              	BITB	#TXIENB
+0131 229D 26 0D              	BNE	TXPUTC1	; Yes, put character in output buffer
+0132 229F CA 20              	ORB	#TXIENB	; no, Enable TX interrupt
+0133 22A1 F7 01 03           	STB	ACMASK
+0134 22A4 F7 E0 08           	STB	ACIACS
+0135 22A7 B7 E0 09           	STA	ACIADA	; output character directly to ACIA
+0136 22AA 20 1D              	BRA	TXPUTC3	; exit
+0137                         *
+0138 22AC BE 21 10           TXPUTC1	LDX	TXCNT	; Test if buffer full
+0139 22AF 8C 00 10           	CMPX	#TXBLEN
+0140 22B2 27 15              	BEQ	TXPUTC3	; Buffer full, exit with Carry set
+0141 22B4 30 01              	LEAX    1,X	; Buffer not full, bump byte count
+0142 22B6 BF 21 10           	STX	TXCNT
+0143                         *
+0144 22B9 BE 21 0C           	LDX	TXIPTR	; Pointer to buffer input
+0145 22BC A7 80              	STA	,X+	; Store charcater in buffer
+0146 22BE 8C 21 22           	CMPX	#TXBUFF+TXBLEN ; Need to wrap buffer pointer ?
+0147 22C1 26 03              	BNE	TXPUTC2	; no, update pointer
+0148 22C3 8E 21 12           	LDX	#TXBUFF	; yes, point to start of buffer
+0149 22C6 BF 21 0C           TXPUTC2	STX	TXIPTR
+0150 22C9 1C EF              TXPUTC3	ANDCC	#$FF-IFLAG ; Clear interrupt mask
+0151 22CB 35 94              	PULS	B,X,PC	; restore registers and exit
+0152                         *
+0153                         * ACIA Interrupt service routine
+0154                         *
+0155 22CD                    ACIJMP	EQU	*
+0156 22CD B6 E0 08           	LDA	ACIACS	; Fetch ACIA status
+0157 22D0 85 AC              	BITA	#$ACIRQ ; Interrupt from ACIA ?
+0158 22D2 27 08              	BEQ	ACIJMPX ; no, exit
+0159                         *
+0160 22D4 85 01              	BITA	#RXFULL ; receive interrupts ?
+0161 22D6 26 05              	BNE	ACIJRX	; yes, go service
+0162 22D8 85 02              ACIJMP1	BITA	#TXEMPTY ; transmit interrupt ?
+0163 22DA 26 26              	BNE	ACIJTX	; yes, go service
+0164                         *
+0165 22DC 3B                 ACIJMPX	RTI		; return from interrupt
+0166                         *
+0167                         * Character Receiver, put in RX input buffer
+0168                         *
+0169 22DD B6 E0 09           ACIJRX	LDA	ACIADA	; Get character from ACIA
+0170                         *
+0171 22E0 BE 01 0A           	LDX	RXCNT
+0172 22E3 8C 20 00           	CMPX	#RXBLEN	; Is input buffer full ?
+0173 22E6 27 15              	BEQ	ACIJRX2	; yes, test for TX interrupt before exiting
+0174 22E8 30 01              	LEAX    1,X
+0175 22EA BF 01 0A           	STX	RXCNT	; Update Buffer byte count
+0176                         *
+0177 22ED BE 01 06           	LDX	RXIPTR	; Point to RX input pionter
+0178 22F0 A7 80              	STA	,X+	; Store character in buffer
+0179 22F2 8C 21 0C           	CMPX	#RXBUFF+RXBLEN ; Reached end of buffer
+0180 22F5 26 03              	BNE	ACIJRX1 ; no, update pointer
+0181 22F7 8E 01 0C           	LDX	#RXBUFF ; yes, wrap around to start of buffer
+0182 22FA BF 01 06           ACIJRX1	STX	RXIPTR
+0183                         *
+0184 22FD B6 E0 08           ACIJRX2 LDA	ACIACS	; Fetch ACIA status
+0185 2300 20 D6              	BRA	ACIJMP1	; test for TX interrupt before exiting
+0186                         *
+0187                         * Character Transmitter, get next from buffer
+0188                         *
+0189 2302 BE 21 10           ACIJTX	LDX	TXCNT	; Any more characters to output ?
+0190 2305 26 0D              	BNE	ACIJTX1	; yes, fetch from tx buffer
+0191                         *
+0192 2307 F6 01 03           	LDB	ACMASK	; No, mask TX interrupt
+0193 230A C4 DF              	ANDB	#$FF-TXIENB
+0194 230C F7 01 03           	STB	ACMASK
+0195 230F F7 E0 08           	STB	ACIACS
+0196 2312 20 C8              	BRA	ACIJMPX	; Exit interrupt routine
+0197                         *
+0198 2314 30 1F              ACIJTX1 LEAX    -1,X 
+0199 2316 BF 21 10           	STX	TXCNT	; One less character in buffer
+0200                         *
+0201 2319 BE 21 0E           	LDX	TXOPTR	; Point to next output character
+0202 231C A6 80              	LDA	,X+	; fetch byte
+0203 231E 8C 21 22           	CMPX	#TXBUFF+TXBLEN	; Reached end of buffer ?
+0204 2321 26 03              	BNE	ACIJTX2	; no, update pointer
+0205 2323 8E 21 12           	LDX	#TXBUFF	; yes, wrap to start of buffer
+0206 2326 BF 21 0E           ACIJTX2	STX	TXOPTR	; Store pointer
+0207                         *
+0208 2329 B7 E0 09           	STA	ACIADA	; Ouput Character to ACIA
+0209 232C 20 AE              	BRA	ACIJMPX	; return from interrupt
+0210                         *
+0211                         ** FLEX 9 COMPACT FLASH DISK DRIVERS
+0212                         *
+0213                         * FOR SYS09BUG 1.2 ON THE BURCHED B5-X300
+0214                         * WITH I/O MAPPED AT $XE000
+0215                         * AND ROM MAPPED AT $XF000
+0216                         * THE BURCHED B5-X300 HAS 256KBYTES OF SRAM
+0217                         * THE FIRST 64K IS USED BY FLEX,
+0218                         * THE SECOND 192K MAY BE USED AS A RAM DISK
+0219                         *
+0220                         *
+0221 0010                    IMASK  EQU $10     IRQ MASK CC
+0222 0040                    FMASK  EQU $40     FIRQ MASK CC
+0223 FFF0                    DATREG EQU $FFF0   DAT REGISTERS
+0224                         *
+0225 E040                    CF_BASE    EQU $E040
+0226 E040                    CF_DATA    EQU CF_BASE+0
+0227 E041                    CF_ERROR   EQU CF_BASE+1 ; read error
+0228 E041                    CF_FEATURE EQU CF_BASE+1 ; write feature
+0229 E042                    CF_SECCNT  EQU CF_BASE+2
+0230 E043                    CF_SECNUM  EQU CF_BASE+3
+0231 E044                    CF_CYLLO   EQU CF_BASE+4
+0232 E045                    CF_CYLHI   EQU CF_BASE+5
+0233 E046                    CF_HEAD    EQU CF_BASE+6
+0234 E047                    CF_STATUS  EQU CF_BASE+7 ; read status
+0235 E047                    CF_COMAND  EQU CF_BASE+7 ; write command
+0236                         *
+0237                         * Command Equates
+0238                         *
+0239 0020                    CMDREAD    EQU $20 ; Read Single sector
+0240 0030                    CMDWRITE   EQU $30 ; Write Single sector
+0241 00EF                    CMDFEATURE EQU $EF
+0242 0001                    FEAT8BIT   EQU $01 ; enable 8 bit transfers
+0243 00E0                    HEADLBA    EQU $E0
+0244                         *
+0245                         * Status bit equates
+0246                         *
+0247 0080                    BSY        EQU $80
+0248 0040                    DRDY       EQU $40
+0249 0008                    DRQ        EQU $08
+0250 0001                    ERR        EQU $01
+0251                         *
+0252                         *
+0253                         * INITIALIZE CF CARD FOR 8 BIT LBA MODE
+0254                         *
+0255 232E BD 23 85           INITDR JSR WAITRDY
+0256 2331 86 E0                     LDA #HEADLBA
+0257 2333 B7 E0 46                  STA CF_HEAD
+0258 2336 BD 23 85                  JSR WAITRDY
+0259 2339 86 01                     LDA #FEAT8BIT
+0260 233B B7 E0 41                  STA CF_FEATURE
+0261 233E 86 EF                     LDA #CMDFEATURE
+0262 2340 B7 E0 47                  STA CF_COMAND
+0263 2343 BD 23 85                  JSR WAITRDY
+0264 2346 39                 WARMD1 RTS
+0265                         *  
+0266                         * WRITE SECTOR TO CF
+0267                         *  
+0268 2347 34 10              WRITE  PSHS X
+0269 2349 86 01                     LDA  #$01
+0270 234B B7 E0 42                  STA  CF_SECCNT
+0271 234E B6 21 24                  LDA  SECNUM
+0272 2351 B7 E0 43                  STA  CF_SECNUM
+0273 2354 B6 21 23                  LDA  TRKNUM
+0274 2357 B7 E0 44                  STA  CF_CYLLO
+0275 235A B6 21 22                  LDA  DRVNUM
+0276 235D B7 E0 45                  STA  CF_CYLHI
+0277                         *
+0278 2360 86 30                     LDA  #CMDWRITE; IDE WRITE MULTIPLE
+0279 2362 B7 E0 47                  STA  CF_COMAND
+0280 2365 BD 23 85                  JSR  WAITRDY
+0281                         *
+0282                         * WRITE LOOP
+0283                         *
+0284 2368 5F                        CLRB
+0285 2369 BD 23 94           WRTLP1 JSR  WAITDRQ
+0286 236C A6 80                     LDA  ,X+
+0287 236E B7 E0 40                  STA  CF_DATA
+0288 2371 5A                        DECB
+0289 2372 26 F5                     BNE  WRTLP1
+0290                         *
+0291 2374 5F                        CLRB
+0292 2375 BD 23 94           WRTLP2 JSR  WAITDRQ
+0293 2378 4F                        CLRA
+0294 2379 B7 E0 40                  STA  CF_DATA
+0295 237C 5A                        DECB
+0296 237D 26 F6                     BNE WRTLP2
+0297                         *
+0298 237F BD 23 85                  JSR WAITRDY
+0299 2382 5F                        CLRB
+0300 2383 35 90                     PULS  X,PC
+0301                         *
+0302                         * WAIT UNTIL READY
+0303                         *
+0304 2385 B6 E0 47           WAITRDY LDA  CF_STATUS
+0305 2388 85 80                      BITA #BSY
+0306 238A 26 F9                      BNE  WAITRDY
+0307 238C B6 E0 47                   LDA  CF_STATUS
+0308 238F 85 40                      BITA #DRDY
+0309 2391 27 F2                      BEQ  WAITRDY
+0310 2393 39                         RTS
+0311                         *
+0312                         * WAIT FOR DATA REQUEST
+0313                         *
+0314 2394 B6 E0 47           WAITDRQ LDA  CF_STATUS
+0315 2397 85 08                      BITA #DRQ
+0316 2399 27 F9                      BEQ  WAITDRQ
+0317 239B 39                         RTS
+0318                         *
+0319                         * PRINT DATA STRING
+0320                         *
+0321 239C 17 FE F5           PDATA1  LBSR TXPUTC
+0322 239F 27 FB                      BEQ  PDATA1
+0323 23A1 A6 80              PDATA   LDA  ,X+
+0324 23A3 81 04                      CMPA #$04
+0325 23A5 26 F5                      BNE  PDATA1
+0326 23A7 39                         RTS
+0327                         * 
+0328                         ***** INPUT BYTE (2 HEX CHAR.) ***** 
+0329                         * 
+0330 23A8 8D 11              BYTE   BSR INHEX GET HEX LEFT 
+0331 23AA 29 35                     BVS NOTHEX EXIT IF NOT VALID HEX 
+0332 23AC 48                        ASLA   ;
+0333 23AD 48                        ASLA   ;
+0334 23AE 48                        ASLA   ; SHIFT INTO LEFT NIBBLE
+0335 23AF 48                        ASLA   ;
+0336 23B0 1F 89                     TFR  A,B PUT HEXL IN "B" 
+0337 23B2 8D 07                     BSR INHEX GET HEX RIGHT 
+0338 23B4 29 2B                     BVS NOTHEX EXIT IF NOT VALID HEX 
+0339 23B6 34 04                     PSHS B PUSH HEXL ON STACK 
+0340 23B8 AB E0                     ADDA ,S+ ADD HEXL TO HEXR AND ADJ. STK 
+0341 23BA 39                        RTS  RETURN WITH HEX L&R IN "A" 
+0342                         * 
+0343                         * 
+0344 23BB 17 FE B4           INHEX  LBSR	RXGETC
+0345 23BE 27 FB                     BEQ	INHEX
+0346 23C0 81 30                     CMPA #'0 IS IT > OR = "0" ? 
+0347 23C2 25 1D                     BCS NOTHEX IF LESS IT AIN'T HEX 
+0348 23C4 81 39                     CMPA #'9 IS IT < OR = "9" ? 
+0349 23C6 22 03                     BHI INHEXA IF > MAYBE IT'S ALPHA 
+0350 23C8 80 30                     SUBA #$30 ASCII ADJ. NUMERIC 
+0351 23CA 39                        RTS  ;
+0352                         * 
+0353                         * 
+0354 23CB 81 41              INHEXA CMPA #'A IS IT > OR = "A" 
+0355 23CD 25 12                     BCS NOTHEX IF LESS IT AIN'T HEX 
+0356 23CF 81 46                     CMPA #'F IS IT < OR = "F" ? 
+0357 23D1 22 03                     BHI INHEXL IF > IT AIN'T HEX 
+0358 23D3 80 37                     SUBA #$37 ASCII ADJ. ALPHA 
+0359 23D5 39                        RTS  ;
+0360                         * 
+0361 23D6 81 61              INHEXL CMPA #'a IS IT > OR = "a" 
+0362 23D8 25 07                     BCS NOTHEX IF LESS IT AIN'T HEX 
+0363 23DA 81 66                     CMPA #'f IS IT < "f" 
+0364 23DC 22 03                     BHI NOTHEX IF > IT AIN'T HEX 
+0365 23DE 80 57                     SUBA #$57 ADJUST TO LOWER CASE 
+0366 23E0 39                        RTS  ;
+0367                         * 
+0368                         * 
+0369 23E1 1A 02              NOTHEX ORCC #2 SET (V) FLAG IN C-CODES REGISTER 
+0370 23E3 39                        RTS  ;
+0371                         *
+0372                         * READ SECTOR FROM ACIA
+0373                         *
+0374 23E4 8E 21 27           READ	LDX	#SECBUF
+0375 23E7 6F E2              	CLR	,-S
+0376 23E9 17 FF BC           READ1	LBSR	BYTE	
+0377 23EC 29 FB              	BVS	READ1
+0378 23EE A7 80              	STA	,X+
+0379 23F0 6A E4              	DEC	,S
+0380 23F2 26 F5              	BNE	READ1
+0381 23F4 8E 21 27           	LDX	#SECBUF
+0382 23F7 35 84              	PULS	B,PC
+0383                         *
+0384                         **********************************************************
+0385                         *
+0386                         * Main line loop
+0387                         *
+0388                         **********************************************************
+0389 23F9 17 FE 2B           LOOP	LBSR	ACINIT	; Initialise ACIA and Buffers
+0390 23FC 17 FF 2F           	LBSR	INITDR	; Initialise CF
+0391 23FF 8E 24 8D                   LDX	#DRVMSG	; Prompt for Drive number
+0392 2402 17 FF 9C           	LBSR	PDATA
+0393                         *
+0394 2405 17 FE 6A           LOOP1	LBSR	RXGETC	; get drive number
+0395 2408 27 FB              	BEQ	LOOP1
+0396 240A 81 58              	CMPA	#'X'
+0397 240C 10 27 00 64        	LBEQ	EXIT
+0398 2410 81 30              	CMPA	#'0'    ; DRIVE 0 to 3
+0399 2412 25 F1              	BLO	LOOP1
+0400 2414 81 33                      CMPA	#'3'
+0401 2416 22 ED              	BHI	LOOP1
+0402 2418 17 FE 79           LOOP1A	LBSR	TXPUTC	; Echo character
+0403 241B 27 FB                      BEQ	LOOP1A
+0404 241D 80 30              	SUBA	#'0'
+0405 241F B7 21 22           	STA	DRVNUM	; Set up drive number
+0406                         *
+0407                         * Read Sector 1 (Boot Sector)
+0408                         *
+0409 2422 86 00              	LDA	#0	; Track 0
+0410 2424 B7 21 23           	STA	TRKNUM
+0411 2427 C6 00              	LDB	#0	; Sector 1
+0412 2429 F7 21 24           	STB	SECNUM
+0413 242C 17 FF B5           	LBSR	READ	; Read first sector from serial Port
+0414 242F 17 FF 15           	LBSR	WRITE	; Write Sector to CF
+0415                         *
+0416                         * Read Sector 2	(Boot Sector)
+0417                         *
+0418 2432 7C 21 24           	INC	SECNUM
+0419 2435 17 FF AC           	LBSR	READ	; Read Second sector from serial Port
+0420 2438 17 FF 0C           	LBSR	WRITE	; Write Sector to CF
+0421                         *
+0422                         * Read Sector 3	(SIR Sector)
+0423                         *
+0424 243B 7C 21 24           	INC	SECNUM
+0425 243E 17 FF A3           	LBSR	READ	; Read System Information Record
+0426 2441 A6 88 26           	LDA	38,X
+0427 2444 B7 21 25           	STA	MAXTRK
+0428 2447 E6 88 27           	LDB	39,X
+0429 244A 5A                 	DECB
+0430 244B F7 21 26           	STB	MAXSEC
+0431 244E 17 FE F6           	LBSR	WRITE	; Write Sector to CF
+0432                         *
+0433                         * Read and Write Remaining Sectors
+0434                         *
+0435 2451 B6 21 23           LOOP2	LDA	TRKNUM
+0436 2454 F6 21 24           	LDB	SECNUM
+0437                         *
+0438 2457 F1 21 26           	CMPB	MAXSEC
+0439 245A 27 03              	BEQ	LOOP3
+0440 245C 5C                 	INCB
+0441 245D 20 07              	BRA	LOOP4
+0442                         *
+0443 245F 5F                 LOOP3	CLRB
+0444 2460 B1 21 25           	CMPA	MAXTRK
+0445 2463 27 0F              	BEQ	EXIT
+0446 2465 4C                 	INCA
+0447                         *
+0448 2466 B7 21 23           LOOP4	STA	TRKNUM
+0449 2469 F7 21 24           	STB	SECNUM
+0450                         *
+0451 246C 17 FF 75           	LBSR	READ
+0452 246F 17 FE D5           	LBSR	WRITE
+0453 2472 20 DD                      BRA     LOOP2
+0454                         *
+0455                         * Disable ACIA interrupts
+0456                         *
+0457 2474 1A 10              EXIT    ORCC    #IFLAG
+0458 2476 B6 01 03           	LDA	ACMASK	; Enable RX Interrupts
+0459 2479 84 5F              	ANDA	#$FF-RXIENB-TXIENB
+0460 247B B7 01 03           	STA	ACMASK
+0461 247E B7 E0 08           	STA	ACIACS
+0462                         *
+0463                         * Restore IRQ vector
+0464                         *
+0465 2481 BE 01 04                   LDX     IRQSAV
+0466 2484 BF DF C8                   STX     IRQVEC
+0467 2487 1C EF                      ANDCC   #$FF-IFLAG
+0468 2489 6E 9F F8 00        	JMP	[MONITOR]
+0469                         *
+0470                         * STRINGS
+0471                         *
+0472 248D 0D 0A              DRVMSG	FCB	$0D,$0A
+0473 248F 43 46 20 44 72 69  	FCC	"CF Drive Loader Routine"
+          76 65 20 4C 6F 61
+          64 65 72 20 52 6F
+          75 74 69 6E 65
+0474 24A6 0D 0A              	FCB	$0D,$0A
+0475 24A8 44 72 69 76 65 20  	FCC	"Drive Number to be loaded (0-3) ?"
+          4E 75 6D 62 65 72
+          20 74 6F 20 62 65
+          20 6C 6F 61 64 65
+          64 20 28 30 2D 33
+          29 20 3F
+0476 24C9 04                 	FCB	$04
+0477                         *
+0478                                 END
+0479                         
+Program + Init Data = 698 bytes
+Error count = 0

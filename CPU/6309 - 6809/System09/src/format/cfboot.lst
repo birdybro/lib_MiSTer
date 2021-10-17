@@ -1,0 +1,171 @@
+Assembler release DWC_2.0 version 2.11
+May 6, 2004 (c) Motorola (free ware)
+0001                          TTL BOOT
+0002                          NAM FLEX LOADER FOR COMPACT FLASH
+
+
+cfboot.txt                                                                      page   2
+0004                         * 6809 BOOTSTRAP FLEX LOADER
+0005                         * FOR SYSTEM09 FPGA SYSTEM
+0006                         
+0007                         * EQUATES:
+0008 C0FF                    STACK EQU $C0FF
+0009 C300                    SCTBUF EQU $C300
+0010                         
+0011 C000                     ORG $C000
+0012 C000 20 09              BOOT BRA LOAD0
+0013 C002 00                  FCB 0
+0014 C003 00                  FCB 0
+0015 C004 00                  FCB 0
+0016 C005 01                 TRK FCB 1
+0017 C006 00                 SCT FCB 0
+0018 C007 00 00              TADR FDB 0
+0019 C009 00 00              LADR FDB 0
+0020                         
+0021                         
+0022 C00B 10 CE C0 FF        LOAD0 LDS #STACK
+0023 C00F FC C0 05            LDD TRK
+0024 C012 FD C3 00            STD SCTBUF
+0025 C015 10 8E C4 00         LDY #SCTBUF+256
+0026                         
+0027 C019 8D 34              LOAD1 BSR GETCH
+0028 C01B 81 02               CMPA #2
+0029 C01D 27 10               BEQ LOAD2
+0030 C01F 81 16               CMPA #$16
+0031 C021 26 F6               BNE LOAD1
+0032 C023 8D 2A               BSR GETCH
+0033 C025 B7 C0 07            STA TADR
+0034 C028 8D 25               BSR GETCH
+0035 C02A B7 C0 08            STA TADR+1
+0036 C02D 20 EA               BRA LOAD1
+0037 C02F 8D 1E              LOAD2 BSR GETCH
+0038 C031 B7 C0 09            STA LADR
+0039 C034 8D 19               BSR GETCH
+0040 C036 B7 C0 0A            STA LADR+1
+0041 C039 8D 14               BSR GETCH
+0042 C03B 1F 89               TFR A,B
+0043 C03D 27 DA               BEQ LOAD1
+0044 C03F BE C0 09            LDX LADR
+0045 C042 34 14              LOAD3 PSHS B,X
+0046 C044 8D 09               BSR GETCH
+0047 C046 35 14               PULS B,X
+0048 C048 A7 80               STA ,X+
+0049 C04A 5A                  DECB
+0050 C04B 26 F5               BNE LOAD3
+0051 C04D 20 CA               BRA LOAD1
+
+
+cfboot.txt                                                                      page   3
+0053 C04F 10 8C C4 00        GETCH CMPY #SCTBUF+256
+0054 C053 26 0F               BNE GETCH4
+0055 C055 8E C3 00           GETCH2 LDX #SCTBUF
+0056 C058 EC 84               LDD 0,X
+0057 C05A 27 0B               BEQ GO
+0058 C05C 8D 11               BSR READ
+0059 C05E 26 0B               BNE LDERR
+0060 C060 10 8E C3 04         LDY #SCTBUF+4
+0061 C064 A6 A0              GETCH4 LDA ,Y+
+0062 C066 39                  RTS
+0063                         
+0064 C067 6E 9F C0 07        GO JMP [TADR]
+0065                         
+0066 C06B 6E 9F FF FE        LDERR JMP [$FFFE]
+0067                         
+0068                         *
+0069                         ** COMPACT FLASH DISK READ ROUTINE
+0070                         *
+0071                         * FOR SYS09BUG 1.2 ON THE BURCHED B5-X300
+0072                         * WITH I/O MAPPED AT $XE000
+0073                         * AND ROM MAPPED AT $XF000
+0074                         * THE BURCHED B5-X300 HAS 256KBYTES OF SRAM
+0075                         * THE FIRST 64K IS USED BY FLEX,
+0076                         * THE SECOND 192K MAY BE USED AS A RAM DISK
+0077                         *
+0078                         *
+0079 0010                    IMASK  EQU $10     IRQ MASK CC
+0080 0040                    FMASK  EQU $40     FIRQ MASK CC
+0081 FFF0                    DATREG EQU $FFF0   DAT REGISTERS
+0082                         *
+0083 E040                    CF_BASE    EQU $E040
+0084 E040                    CF_DATA    EQU CF_BASE+0
+0085 E041                    CF_ERROR   EQU CF_BASE+1 ; read error
+0086 E041                    CF_FEATURE EQU CF_BASE+1 ; write feature
+0087 E042                    CF_SECCNT  EQU CF_BASE+2
+0088 E043                    CF_SECNUM  EQU CF_BASE+3
+0089 E044                    CF_CYLLO   EQU CF_BASE+4
+0090 E045                    CF_CYLHI   EQU CF_BASE+5
+0091 E046                    CF_HEAD    EQU CF_BASE+6
+0092 E047                    CF_STATUS  EQU CF_BASE+7 ; read status
+0093 E047                    CF_COMAND  EQU CF_BASE+7 ; write command
+0094                         *
+0095                         * Command Equates
+0096                         *
+0097 0020                    CMDREAD    EQU $20 ; Read Single sector
+0098 0030                    CMDWRITE   EQU $30 ; Write Single sector
+0099 00EF                    CMDFEATURE EQU $EF
+0100 0001                    FEAT8BIT   EQU $01 ; enable 8 bit transfers
+0101 00E0                    HEADLBA    EQU $E0
+0102                         *
+0103                         * Status bit equates
+0104                         *
+0105 0080                    BSY        EQU $80
+0106 0040                    DRDY       EQU $40
+0107 0008                    DRQ        EQU $08
+0108 0001                    ERR        EQU $01
+0109                         *
+0110                         * READ SECTOR FROM CF
+0111                         * ACCA = TRACK
+0112                         * ACCB = SECTOR
+0113                         * X    = BUFFER POINTER
+0114                         *
+0115 C06F B7 E0 44           READ   STA  CF_CYLLO
+0116 C072 5A                        DECB
+0117 C073 F7 E0 43                  STB  CF_SECNUM
+0118 C076 86 01                     LDA  #$01
+0119 C078 B7 E0 42                  STA  CF_SECCNT
+0120 C07B 4F                        CLRA
+0121 C07C B7 E0 45                  STA  CF_CYLHI
+0122                         *
+0123 C07F 86 20                     LDA  #CMDREAD ; IDE READ MULTIPLE
+0124 C081 B7 E0 47                  STA  CF_COMAND
+0125 C084 BD C0 A2                  JSR  WAITRDY
+0126                         *
+0127                         * READ LOOP
+0128                         *
+0129 C087 5F                        CLRB
+0130 C088 BD C0 B1           RDLP1  JSR  WAITDRQ
+0131 C08B B6 E0 40                  LDA  CF_DATA
+0132 C08E A7 80                     STA  ,X+
+0133 C090 5A                        DECB
+0134 C091 26 F5                     BNE  RDLP1
+0135                         *
+0136 C093 5F                        CLRB
+0137 C094 BD C0 B1           RDLP2  JSR  WAITDRQ
+0138 C097 B6 E0 40                  LDA  CF_DATA
+0139 C09A 5A                        DECB
+0140 C09B 26 F7                     BNE  RDLP2
+0141                         *
+0142 C09D BD C0 A2                  JSR  WAITRDY
+0143 C0A0 5F                        CLRB
+0144 C0A1 39                        RTS
+0145                         *
+0146                         * WAIT UNTIL READY
+0147                         *
+0148 C0A2 B6 E0 47           WAITRDY LDA  CF_STATUS
+0149 C0A5 85 80                      BITA #BSY
+0150 C0A7 26 F9                      BNE  WAITRDY
+0151 C0A9 B6 E0 47                   LDA  CF_STATUS
+0152 C0AC 85 40                      BITA #DRDY
+0153 C0AE 27 F2                      BEQ  WAITRDY
+0154 C0B0 39                         RTS
+0155                         *
+0156                         * WAIT FOR DATA REQUEST
+0157                         *
+0158 C0B1 B6 E0 47           WAITDRQ LDA  CF_STATUS
+0159 C0B4 85 08                      BITA #DRQ
+0160 C0B6 27 F9                      BEQ  WAITDRQ
+0161 C0B8 39                         RTS
+0162                         *
+0163                                 END
+Program + Init Data = 185 bytes
+Error count = 0

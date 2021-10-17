@@ -1,0 +1,220 @@
+# XSA-3S1000 Board FPGA pin assignment constraints
+#
+# Clocks
+#
+#net CLKA          loc=T9;        # 100MHz
+#net CLKB          loc=P8;        # 50MHz
+#net CLKC          loc=R9;        # ??Mhz
+net CLK100        loc=T9;        # 100MHz Clock
+#
+# Push button switches
+#
+NET SW2_N         loc=E11;       # active-low pushbutton 
+NET SW3_N         loc=A13;       # active-low pushbutton
+#
+# PS/2 Keyboard
+net PS2_CLK       loc=B16; 
+net PS2_DAT       loc=E13; 
+#
+# Status LED
+#
+net STATUS_LED<0> loc=M6;  
+net STATUS_LED<1> loc=M11; 
+net STATUS_LED<2> loc=N6;  
+net STATUS_LED<3> loc=R7;  
+net STATUS_LED<4> loc=P10; 
+net STATUS_LED<5> loc=T7;  
+net STATUS_LED<6> loc=R10; 
+#
+# VGA Outputs
+#
+NET VGA_BLUE<0>   LOC=C9;        
+NET VGA_BLUE<1>   LOC=E7;        
+NET VGA_BLUE<2>   LOC=D5;        
+NET VGA_GREEN<0>  LOC=A8;        
+NET VGA_GREEN<1>  LOC=A5;        
+NET VGA_GREEN<2>  LOC=C3;        
+NET VGA_RED<0>    LOC=C8;        
+NET VGA_RED<1>    LOC=D6;        
+NET VGA_RED<2>    LOC=B1;        
+NET VGA_HSYNC_N   LOC=B7;        
+NET VGA_VSYNC_N   LOC=D8;        
+#
+# Flash memory interface
+#
+#net FLASH_A<0>   LOC=N5;
+#net FLASH_A<1>   LOC=K14;
+#net FLASH_A<2>   LOC=K13;
+#net FLASH_A<3>   LOC=K12;
+#net FLASH_A<4>   LOC=L14;
+#net FLASH_A<5>   LOC=M16;
+#net FLASH_A<6>   LOC=L13;
+#net FLASH_A<7>   LOC=N16;
+#net FLASH_A<8>   LOC=N14;
+#net FLASH_A<9>   LOC=P15;
+#net FLASH_A<10>  LOC=R16;
+#net FLASH_A<11>  LOC=P14;
+#net FLASH_A<12>  LOC=P13;
+#net FLASH_A<13>  LOC=N12;
+#net FLASH_A<14>  LOC=T14;
+#net FLASH_A<15>  LOC=R13;
+#net FLASH_A<16>  LOC=N10;
+#net FLASH_A<17>  LOC=M14;
+#net FLASH_A<18>  LOC=K3;
+#net FLASH_A<19>  LOC=K4;
+#net FLASH_D<8>   LOC=T4;
+#net FLASH_D<9>   LOC=R5;
+#net FLASH_D<10>  LOC=T5;
+#net FLASH_D<11>  LOC=P6;
+#net FLASH_D<12>  LOC=M7;
+#net FLASH_D<13>  LOC=R6;
+#net FLASH_D<14>  LOC=N7;
+#net FLASH_D<15>  LOC=P7;
+#net FLASH_CE_N   LOC=R4;
+#net FLASH_OE_N   LOC=P5;
+#net FLASH_WE_N   LOC=M13;
+#net FLASH_BYTE_N LOC=T8;
+#net FLASH_RDY    LOC=L12;
+#net FLASH_RST_N  LOC=P16;
+#
+# Manually assign locations for the DCMs along the bottom of the FPGA
+# because PAR sometimes places them in opposing corners and that ruins the clocks.
+#INST "u2_dllint" LOC="DCM_X0Y0";
+#INST "u2_dllext" LOC="DCM_X1Y0";
+#
+# SDRAM memory pin assignments
+#
+#net SDRAM_clkfb  loc=N8;  # feedback SDRAM clock after PCB delays
+#net SDRAM_clkout loc=E10; # clock to SDRAM
+#net SDRAM_CKE    loc=D7;  # SDRAM clock enable
+#net SDRAM_CS_N   loc=B8;  # SDRAM chip-select
+#net SDRAM_RAS_N  loc=A9;  
+#net SDRAM_CAS_N  loc=A10; 
+#net SDRAM_WE_N   loc=B10; 
+#net SDRAM_DQMH   loc=D9;  
+#net SDRAM_DQML   loc=C10; 
+#net SDRAM_A<0>   loc=B5;  
+#net SDRAM_A<1>   loc=A4;  
+#net SDRAM_A<2>   loc=B4;  
+#net SDRAM_A<3>   loc=E6;  
+#net SDRAM_A<4>   loc=E3;  
+#net SDRAM_A<5>   loc=C1;  
+#net SDRAM_A<6>   loc=E4;  
+#net SDRAM_A<7>   loc=D3;  
+#net SDRAM_A<8>   loc=C2;  
+#net SDRAM_A<9>   loc=A3;  
+#net SDRAM_A<10>  loc=B6;  
+#net SDRAM_A<11>  loc=C5;  
+#net SDRAM_A<12>  loc=C6;  
+#net SDRAM_D<0>   loc=C15; 
+#net SDRAM_D<1>   loc=D12; 
+#net SDRAM_D<2>   loc=A14; 
+#net SDRAM_D<3>   loc=B13; 
+#net SDRAM_D<4>   loc=D11; 
+#net SDRAM_D<5>   loc=A12; 
+#net SDRAM_D<6>   loc=C11; 
+#net SDRAM_D<7>   loc=D10; 
+#net SDRAM_D<8>   loc=B11; 
+#net SDRAM_D<9>   loc=B12; 
+#net SDRAM_D<10>  loc=C12; 
+#net SDRAM_D<11>  loc=B14; 
+#net SDRAM_D<12>  loc=D14; 
+#net SDRAM_D<13>  loc=C16; 
+#net SDRAM_D<14>  loc=F12; 
+#net SDRAM_D<15>  loc=F13; 
+#net SDRAM_BA<0>  loc=A7;  
+#net SDRAM_BA<1>  loc=C7;  
+#
+# Parallel Port
+#
+#net PPORT_load    loc=n14;
+#net PPORT_clk     loc=p15;
+#net PPORT_din<0>  loc=r16;
+#net PPORT_din<1>  loc=p14;
+#net PPORT_din<2>  loc=p13;
+#net PPORT_din<3>  loc=n12;
+#net PPORT_dout<0> loc=n5;
+#net PPORT_dout<1> loc=k14;
+#net PPORT_dout<2> loc=k13;
+#net PPORT_dout<3> loc=t10;
+#
+#
+#net PPORT_d<0>    loc=N14; # FLASH_A<8>  / PPORT_LOAD
+#net PPORT_d<1>    loc=P15; # FLASH_A<9>  / PPORT_CLK
+#net PPORT_d<2>    loc=R16; # FLASH_A<10> / PPORT_DIN<0>
+#net PPORT_d<3>    loc=P14; # FLASH_A<11> / PPORT_DIN<1>
+#net PPORT_d<4>    loc=P13; # FLASH_A<12> / PPORT_DIN<2>
+#net PPORT_d<5>    loc=N12; # FLASH_A<13> / PPORT_DIN<3>
+## net PPORT_d<6>   loc=T14; # FLASH_A<14>
+## net PPORT_d<7>   loc=R13; # FLASH_A<15>
+#
+#net PPORT_s<3>    loc=N5;  # FLASH_A<0> / PPORT_DOUT<0>
+#net PPORT_s<4>    loc=K14; # FLASH_A<1> / PPORT_DOUT<1>
+#net PPORT_s<5>    loc=K13; # FLASH_A<2> / PPORT_DOUT<2>
+#net PPORT_s<6>    loc=T10; #            / PPORT_DOUT<3>
+#
+########################################################
+#
+# XST3.0 pins
+#
+########################################################
+#
+# BAR LED
+#
+#net BAR_LED<1>     loc=L5;  # barled 1
+#net BAR_LED<2>     loc=N2;  # barled 2
+#net BAR_LED<3>     loc=M3;  # barled 3
+#net BAR_LED<4>     loc=N1;  # barled 4
+#net BAR_LED<5>     loc=T13; # barled 5
+#net BAR_LED<6>     loc=L15; # barled 6
+#net BAR_LED<7>     loc=J13; # barled 7
+#net BAR_LED<8>     loc=H15; # barled 8
+#
+# Push Buttons
+#
+#net PB1_N          loc=H4;  # pushbutton PB1
+#
+# RS232 PORT
+#
+net RS232_TXD      loc=J2;  # RS232 TD pin 3
+net RS232_RXD      loc=G5;  # RS232 RD pin 2
+net RS232_CTS      loc=D1;  # RS232 CTS
+net RS232_RTS      loc=F4;  # RS232 RTS
+#
+# IDE Interface
+#
+net IDE_IOR_N      loc=P2;  # disk I/O read control
+net IDE_IOW_N      loc=R1;  # disk I/O write control
+net IDE_CS0_N      loc=G15; # disk register-bank select
+net IDE_CS1_N      loc=G14; # disk register-bank select
+net IDE_A<0>       loc=L5;  # 3-bit disk register address bus
+net IDE_A<1>       loc=N2;  
+net IDE_A<2>       loc=M3;  
+net IDE_D<0>       loc=P12; # 16-bit disk data bus
+net IDE_D<1>       loc=J1;  
+net IDE_D<2>       loc=H1;  
+net IDE_D<3>       loc=H3;  
+net IDE_D<4>       loc=G2;  
+net IDE_D<5>       loc=K15; 
+net IDE_D<6>       loc=K16; 
+net IDE_D<7>       loc=F15; 
+net IDE_D<8>       loc=E2;  
+net IDE_D<9>       loc=E1;  
+net IDE_D<10>      loc=F3;  
+net IDE_D<11>      loc=F2;  
+net IDE_D<12>      loc=G4;  
+net IDE_D<13>      loc=G3;  
+net IDE_D<14>      loc=G1;  
+net IDE_D<15>      loc=H4;  
+#net IDE_IRQ        loc=H15; # IDE interrupt
+#net IDE_DMACK_N    loc=K1;  # IDE DMA acknowledge
+#
+# Ethernet Controller
+# Disable if not used
+#
+net ethernet_cs_n  loc=G13; # Ethernet chip-enable 
+#
+# Timing Constraints
+#
+NET "CLK100" TNM_NET="CLK100"; 
+TIMESPEC "TS_clk"=PERIOD "CLK100" 10 ns HIGH 50 %; 

@@ -1,0 +1,17 @@
+PROMGEN: Xilinx Prom Generator H.42
+Copyright (c) 1995-2005 Xilinx, Inc.  All rights reserved.
+
+promgen -w -p mcs -c FF -o c:\vhdl\system09\rtl\system09_burched_b3//System09_B3.mcs -u 0 C:\Vhdl\System09\rtl\System09_BurchED_B3\system09_cclktemp.bit -x xc18v02 
+
+PROM c:\vhdl\system09\rtl\system09_burched_b3//System09_B3.prm map: Mon Jul 02 00:08:04 2007
+
+Calculating PROM checksum with fill value ff
+
+Format        Mcs86 (32-bit)
+Size          256K
+PROM start    0000:0000
+PROM end      0003:ffff
+PROM checksum 0221466d
+
+        Addr1        Addr2 File(s)
+    0000:0000    0002:8c43 C:/Vhdl/System09/rtl/System09_BurchED_B3/system09_cclktemp.bit

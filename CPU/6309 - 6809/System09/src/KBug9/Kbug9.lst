@@ -1,0 +1,1463 @@
+Assembler release DWC_2.0 version 2.11
+May 6, 2004 (c) Motorola (free ware)
+0001                          NAM SBUG9
+0002                         *
+0003                         ** MONITOR MEMORY MAP
+0004                         *
+0005 F0C0                    RAM     EQU    $F0C0     START OF MONITOR RAM
+0006 F800                    ROM     EQU    $F800     START OF MONITOR ROM
+0007 E000                    EXTIO   EQU    $E000     OFF BOARD IO BASE
+0008 E400                    INTIO   EQU    $E400     ON BOARD DEVICES
+0009                         *
+0010                         * OPTION SWITCHES
+0011                         *
+0012                         *VIDOPT EQU $00 NO VIDEO
+0013 00FF                    PRTOPT EQU $FF PRINTER
+0014 00FF                    CLKOPT EQU $FF REAL TIME CLOCK
+0015 00FF                    FDCOPT EQU $FF FLOPPY DISK
+0016                         *
+0017                         ******************************************************
+0018                         *
+0019                         * IO EQUATES:
+0020                         *
+0021                         ******************************************************
+0022                         *
+0023                         ** ACIA - TTY INTERFACE
+0024                         *
+0025 E400                    ACIAS  EQU INTIO+$00
+0026                          IFD PRTOPT
+0027                         *
+0028                         ** PRINTER INTERFACE
+0029                         *
+0030 E404                    PADATA EQU INTIO+$04
+0031 E405                    PACTRL EQU INTIO+$05
+0032 E406                    PBDATA EQU INTIO+$06
+0033 E407                    PBCTRL EQU INTIO+$07
+0034                         *
+0035                         ** CB1  ACK.  I/P
+0036                         ** CB2  STB.  O/P
+0037                         ** PB0 - PB7   DATA 1 - 8   O/P
+0038                         ** PORT A BIT ASSIGNMENT
+0039                         *
+0040 0080                    PBUSY  EQU $80 I/P
+0041 0040                    PEMPTY EQU $40 I/P
+0042 0020                    SELECT EQU $20 I/P
+0043 0010                    PERROR EQU $10 I/P
+0044 0004                    PRESET EQU %00000100 O/P PA3 = 0
+0045 0008                    AUTOFD EQU %00001000 O/P PA2 = 0
+0046 000C                    DIRMSK EQU %00001100
+0047                          ENDIF PRTOPT
+0048                          IFD FDCOPT
+0049                         *
+0050                         ** FLOPPY DISK CONTROLLER
+0051                         *
+0052 E014                    DRVREG EQU EXTIO+$14
+0053 E018                    CMDREG EQU EXTIO+$18
+0054 E01A                    SECREG EQU EXTIO+$1A
+0055 E01B                    DATREG EQU EXTIO+$1B
+0056                          ENDIF FDCOPT
+0057                          IFD VIDOPT
+0058                         *
+0059                         ** VIDEO DISPLAY DEFINITIONS
+0060                         *
+0061                         SCREEN  EQU    $E800     START OF SCREEN MEMORY
+0062                         LINLEN  EQU    64       LENGTH OF A LINE
+0063                         NUMLIN  EQU    16       NUMBER OF LINES
+0064                         SCNLEN  EQU    $400      LENGTH OF SCREEN
+0065                          ENDIF VIDOPT
+0065                          ENDIF VIDOPT
+0066                          IFD CLKOPT
+0067                         *
+0068                         *
+0069                         * MM58167A REAL TIME CLOCK MEMORY MAP:
+0070                         *
+0071 E040                    CLOCK  EQU $E040 CLOCK BASE ADDRESS AND REGISTERS
+0072                         *
+0073                         * CLOCK REGISTER OFFSETS:
+0074                         * These register offsets are used for the CLOCK
+0075                         * and comparitor ram CMPRAM.
+0076                         *
+0077 0000                    S10000 EQU 0 TEN THOUNSANDTHS OF SECONDS
+0078 0001                    S100   EQU 1 HUNDRETHS AND TENTHS OF SECONDS
+0079 0002                    SECOND EQU 2
+0080 0003                    MINUIT EQU 3
+0081 0004                    HOUR   EQU 4
+0082 0005                    WKDAY  EQU 5
+0083 0006                    MTHDAY EQU 6
+0084 0007                    MONTH  EQU 7
+0085                         *
+0086                         * COUNTER AND COMPARITOR REGISTERS:
+0087                         *
+0088                         * Both the Clock Counter and Clock Comparitor
+0089                         * consist of 8 registers for holding the time.
+0090                         * The register offsets from the Counter and
+0091                         * Comparitor registers are listed above.
+0092                         *
+0093 E040                    COUNTR EQU CLOCK+0
+0094 E048                    CMPRAM EQU CLOCK+8 COMPARITOR REGISTERS
+0095                         *
+0096                         * INTERRUPT OUTPUT REGISTERS:
+0097                         *
+0098                         * An interrupt output may be generated at the
+0099                         * following rates by setting the appropriate bit
+0100                         * in the Interrupt Control Register (CINTCR).
+0101                         * The Interrupt Status Register (CINTSR) must be
+0102                         * read to clear the interrupt and will return
+0103                         * the source of the interrupt.
+0104                         *
+0105                         * 1/Month      Bit 7
+0106                         * 1/Week       Bit 6
+0107                         * 1/Day        Bit 5
+0108                         * 1/Hour       Bit 4
+0109                         * 1/Minuite    Bit 3
+0110                         * 1/Second     Bit 2
+0111                         * 10/Second    Bit 1
+0112                         * Comparitor   Bit 0
+0113                         *
+0114 E050                    CINTSR  EQU CLOCK+16 INTERRUPT STATUS REGISTER
+0115 E051                    CINTCR  EQU CLOCK+17 INTERRUPT CONTROL REGISTER
+0116                         *
+0117                         * COUNTER AND RAM RESETS; GO COMMAND.
+0118                         *
+0119                         * The counter and comparitor may be reset
+0120                         * by writing $FF into CTRRES and CMPRES
+0121                         * respectivly.
+0122                         * A write to the Go command register (GOCMND)
+0123                         * will reset the 1/1000ths, 1/100ths and 1/10ths
+0124                         * of a second counter.
+0125                         *
+0126 E052                    CTRRES EQU CLOCK+18 COUNTER RESET
+0127 E053                    CMPRES EQU CLOCK+19 COMPARITOR RAM RESET
+0128 E055                    GOCMND EQU CLOCK+21 GO COMMAND
+0129                         *
+0130                         * CLOCK STATUS REGISTER.
+0131                         *
+0132                         * The counter takes 61 usec. to rollover for
+0133                         * every 1KHz clock pulse. If the Status bit is
+0134                         * set after reading the counter, the counter
+0135                         * should be re-read to ensure the time is correct.
+0136                         *
+0137 E054                    CLKSTA EQU CLOCK+20 STATUS BIT
+0138 E056                    SBYINT EQU CLOCK+22 STANDBY INTERRUPT
+0139 E05F                    TSTMOD EQU CLOCK+31 TEST MODE REGISTER
+0140                          ENDIF CLKOPT
+0141                         *****************************************************
+0142                         *
+0143                         * RAM ALLOCATION:
+0144                         *
+0145                         *****************************************************
+0146                         *
+0147                         ** ALTERABLE INTERRUPT VECTOR TABLE
+0148                         *
+0149 F0C0                     ORG RAM
+0150 F0C0                    STACK RMB 2 $F0C0
+0151 F0C2                    SWI3 RMB 2 $F0C2
+0152 F0C4                    SWI2 RMB 2 $F0C4
+0153 F0C6                    FIRQ RMB 2 $F0C6
+0154 F0C8                    IRQ RMB 2 $F0C8
+0155 F0CA                    SWI RMB 2 $F0CA
+0156 F0CC                    SVCVO RMB 2 $F0CC
+0157 F0CE                    SVCVL RMB 2 $F0CE
+0158                         *
+0159                         ** I/O CONTROL PARAMETERS
+0160                         *
+0161 F0D0                    CPORT RMB 2 $F0E0 - REVECTORABLE CONTROL PORT
+0162 F0D2                    ECHO RMB 1 $F0E2 - ECHO FLAG
+0163                          IFD VIDOPT
+0164                         ***************************************************
+0165                         *   DG640 MEMORY MAPPED DISPLAY DRIVER VARIABLES  *
+0166                         ***************************************************
+0167                         
+0168                         ***** ALWAYS KEEP THESE TWO BYTES TOGETHER *****
+0169                         COLADX  RMB    1         CURSOR COLUMN
+0170                         ROWADX  RMB    1         CURSOR ROW
+0171                         *************************************************
+0172                         CURSOR  RMB    2         ABSOLUTE SCREEN ADDRESS
+0173                         NEWROW  RMB    1         NEW ROW TEMP FOR ESCAPE
+0174                         ESCFLG  RMB    1         ESCAPE SEQUENCE ACTIVE
+0175                          ENDIF VIDOPT
+0175                          ENDIF VIDOPT
+0176                         *
+0177                         * ACIA/VDU OUTPUT SWITCH
+0178                         *
+0179 F0D3                    OUTFLG  RMB    1        ACIA/VDU OUTPUT SWITCH
+0180 0001                    VIDBIT EQU $01 VIDEO OUTPUT
+0181 0002                    SERBIT EQU $02 SERIAL OUTPUT
+0182 0004                    PRTBIT EQU $04 PRINTER OUTPUT
+0183                         *
+0184 F0D4                    BPTBL RMB 24 $F0E3 - BREAK POINT TABLE BASE ADDRESS
+0185                         *
+0186                         ** MONITOR ROUTINE JUMP VECTORS
+0187                         *
+0188 F800                     ORG ROM
+0189 F800 F8 26               FDB MONITOR
+0190 F802 F8 62               FDB NEXTCMD
+0191 F804 FC 2C               FDB INCH
+0192 F806 FC 4A               FDB INCHE
+0193 F808 FC 3B               FDB INCHEK
+0194 F80A FC 4E               FDB OUTCH
+0195 F80C FC 25               FDB PDATA
+0196 F80E FC 1A               FDB PCRLF
+0197 F810 FC 16               FDB PSTRNG
+0198 F812 F9 E0               FDB LRA
+0199                          IFD PRTOPT
+0200 F814 FC C1               FDB PCHK  CHECK FOR PRINTER INPUT
+0201 F816 FC 83               FDB PINIZ INITIATE PRINTER
+0202 F818 FC AD               FDB POUTCH OUTPUT CH. TO PRINTER
+0203                          ELSE
+0204                          FDB DUMRTS
+0205                          FDB DUMRTS
+0206                          FDB DUMRTS
+0207                          ENDIF PRTOPT
+0207                          ENDIF PRTOPT
+0208                          IFD VIDOPT
+0209                          FDB VINIZ
+0210                          FDB VOUTCH
+0211                          ELSE
+0212 F81A F9 E0               FDB DUMRTS
+0213 F81C F9 E0               FDB DUMRTS
+0214                          ENDIF VIDOPT
+0215 F81E FC 61               FDB ACINIZ
+0216 F820 FC 74               FDB AOUTCH
+0217                         *
+0218                         ** POWER ON RESET
+0219                         *
+0220 F822 10 CE F0 C0        START LDS #STACK
+0221                         *
+0222                         ** MONITOR ENTRY POINT
+0223                         *
+0224                         ** MOVE ROM INTERRUPT JUMP VECTORS TO RAM
+0225                         *
+0226 F826 8E FD 58           MONITOR LDX #RAMVEC
+0227 F829 10 8E F0 C0         LDY #STACK
+0228 F82D C6 10               LDB #$10
+0229 F82F A6 80              LOOPA LDA ,X+
+0230 F831 A7 A0               STA ,Y+
+0231 F833 5A                  DECB 
+0232 F834 26 F9               BNE LOOPA
+0233                         *
+0234                         ** SET UP CONTROL PORT POINTER
+0235                         ** (USUALLY AN ACIA)
+0236                         *
+0237 F836 8E E4 00            LDX #ACIAS
+0238 F839 BF F0 D0            STX CPORT
+0239 F83C 17 01 68            LBSR XBKPNT
+0240                         *
+0241                         ** CLEAR 12 ENTRIES ON STACK
+0242                         *
+0243 F83F C6 0C               LDB #$0C
+0244 F841 6F E2              CLRSTK CLR ,-S
+0245 F843 5A                  DECB 
+0246 F844 26 FB               BNE CLRSTK
+0247 F846 30 8C DD            LEAX MONITOR,PCR PRESET PC TO MONITOR
+0248 F849 AF 6A               STX $0A,S
+0249 F84B 86 D0               LDA #$D0 PRESET C.C.
+0250 F84D A7 E4               STA ,S
+0251 F84F 1F 43               TFR S,U
+0252                         *
+0253                         ** INITIATE VDU AND ACIA
+0254                         *
+0255 F851 86 02               LDA #SERBIT START UP ON ACIA
+0256 F853 B7 F0 D3            STA OUTFLG
+0257 F856 17 04 08            LBSR ACINIZ
+0258                          IFD VIDOPT
+0259                          LBSR VINIZ
+0260                          ENDIF VIDOPT
+0260                          ENDIF VIDOPT
+0261                          IFD CLKOPT
+0262 F859 17 05 B6            LBSR CLKINZ
+0263                          ENDIF CLKOPT
+0264 F85C 8E FD 68            LDX #TTLMSG
+0265 F85F 17 03 C3            LBSR PDATA
+0266                         *
+0267                         ** GET COMMAND FROM OPERATOR
+0268                         *
+0269 F862 8E FD 83           NEXTCMD LDX #PMTMSG
+0270 F865 17 03 AE            LBSR PSTRNG
+0271 F868 17 03 C1            LBSR INCH
+0272 F86B 84 7F               ANDA #$7F
+0273 F86D 81 0D               CMPA #$0D
+0274 F86F 27 F1               BEQ NEXTCMD
+0275 F871 1F 89               TFR A,B
+0276 F873 81 20               CMPA #$20
+0277 F875 2C 09               BGE PRTCMD
+0278 F877 86 5E               LDA #$5E
+0279 F879 17 03 D2            LBSR OUTCH
+0280 F87C 1F 98               TFR B,A
+0281 F87E 8B 40               ADDA #$40
+0282 F880 17 03 CB           PRTCMD LBSR OUTCH
+0283 F883 17 02 85            LBSR OUT1S
+0284                         *
+0285                         ** DO COMMAND TABLE LOOKUP
+0286                         *
+0287 F886 8E FD 19            LDX #JMPTAB
+0288 F889 E1 80              NXTCHR CMPB ,X+
+0289 F88B 27 0F               BEQ JMPCMD
+0290 F88D 30 02               LEAX $02,X
+0291 F88F 8C FD 58            CMPX #RAMVEC
+0292 F892 26 F5               BNE NXTCHR
+0293 F894 8E FD 85            LDX #QRYMSG
+0294 F897 17 03 8B            LBSR PDATA
+0295 F89A 20 C6               BRA NEXTCMD
+0296 F89C AD 94              JMPCMD JSR [,X]
+0297 F89E 20 C2               BRA NEXTCMD
+0298                         *
+0299                         ** "M" MEMORY EXAMINE AND CHANGE
+0300                         *
+0301 F8A0 17 02 27           MEMCHG LBSR IN1ADR
+0302 F8A3 29 2D               BVS CHRTN
+0303 F8A5 1F 12               TFR X,Y
+0304 F8A7 8E FD 8B           MEMC2 LDX #SEPMSG
+0305 F8AA 17 03 69            LBSR PSTRNG
+0306 F8AD 1F 21               TFR Y,X
+0307 F8AF 17 03 46            LBSR OUT4H
+0308 F8B2 17 02 56            LBSR OUT1S
+0309 F8B5 A6 A4               LDA ,Y
+0310 F8B7 17 03 46            LBSR OUT2H
+0311 F8BA 17 02 4E            LBSR OUT1S
+0312 F8BD 17 02 1A            LBSR BYTE
+0313 F8C0 28 11               BVC CHANGE
+0314 F8C2 81 08               CMPA #$08
+0315 F8C4 27 E1               BEQ MEMC2
+0316 F8C6 81 18               CMPA #$18
+0317 F8C8 27 DD               BEQ MEMC2
+0318 F8CA 81 5E               CMPA #$5E
+0319 F8CC 27 17               BEQ BACK
+0320 F8CE 81 0D               CMPA #$0D
+0321 F8D0 26 0F               BNE FORWRD
+0322 F8D2 39                 CHRTN RTS
+0323                         *
+0324 F8D3 A7 A4              CHANGE STA ,Y
+0325 F8D5 A1 A4               CMPA ,Y
+0326 F8D7 27 08               BEQ FORWRD
+0327 F8D9 17 02 2F            LBSR OUT1S
+0328 F8DC 86 3F               LDA #$3F
+0329 F8DE 17 03 6D            LBSR OUTCH
+0330 F8E1 31 21              FORWRD LEAY $01,Y
+0331 F8E3 20 C2               BRA MEMC2
+0332                         *
+0333 F8E5 31 3F              BACK LEAY -$01,Y
+0334 F8E7 20 BE               BRA MEMC2
+0335                         *
+0336                         ** "S" DISPLAY CONTENTS OF STACK
+0337                         *
+0338 F8E9 17 02 A2           DISSTK LBSR PRTSP
+0339 F8EC 1F 32               TFR U,Y
+0340 F8EE 8E F0 C0            LDX #STACK
+0341 F8F1 30 1F               LEAX -$01,X
+0342 F8F3 20 05               BRA MDUMP1
+0343                         *
+0344 F8F5 17 01 C8           MEMDUMP LBSR IN2ADR
+0345 F8F8 29 06               BVS EDPRTN
+0346 F8FA 34 20              MDUMP1 PSHS Y
+0347 F8FC AC E1               CMPX ,S++
+0348 F8FE 24 01               BCC AJDUMP
+0349 F900 39                 EDPRTN RTS
+0350                         *
+0351                         * ADJUST LOWER AND UPPER ADDRESS LIMITS
+0352                         * TO EVEN 16 BYTE BOUNDARIES.
+0353                         * ENTER WITH LOWER ADDRESS IN XREG
+0354                         *            UPPER ADDRESS ON TOP OF STACK.
+0355                         *
+0356 F901 1F 10              AJDUMP TFR X,D
+0357 F903 C3 00 10            ADDD #$0010
+0358 F906 C4 F0               ANDB #$F0
+0359 F908 34 06               PSHS B,A
+0360 F90A 1F 20               TFR Y,D
+0361 F90C C4 F0               ANDB #$F0
+0362 F90E 1F 01               TFR D,X
+0363 F910 AC E4              NXTLIN CMPX ,S
+0364 F912 27 05               BEQ SKPDMP
+0365 F914 17 03 24            LBSR INCHEK
+0366 F917 27 03               BEQ EDUMP
+0367 F919 32 62              SKPDMP LEAS $02,S
+0368 F91B 39                  RTS
+0369                         *
+0370                         ** "E" DUMP MEMORY
+0371                         *
+0372 F91C 34 10              EDUMP PSHS X
+0373 F91E 8E FD 8B            LDX #SEPMSG
+0374 F921 17 02 F2            LBSR PSTRNG
+0375 F924 AE E4               LDX ,S
+0376 F926 17 02 CF            LBSR OUT4H
+0377 F929 17 01 DD            LBSR OUT2S
+0378 F92C C6 10               LDB #$10
+0379 F92E A6 80              ELOOP LDA ,X+
+0380 F930 17 02 CD            LBSR OUT2H
+0381 F933 17 01 D5            LBSR OUT1S
+0382 F936 5A                  DECB 
+0383 F937 26 F5               BNE ELOOP
+0384 F939 17 01 CD            LBSR OUT2S
+0385 F93C AE E1               LDX ,S++
+0386 F93E C6 10               LDB #$10
+0387 F940 A6 80              EDPASC LDA ,X+
+0388 F942 81 20               CMPA #$20
+0389 F944 25 04               BCS PERIOD
+0390 F946 81 7E               CMPA #$7E
+0391 F948 23 02               BLS PRASC
+0392 F94A 86 2E              PERIOD LDA #$2E
+0393 F94C 17 02 FF           PRASC LBSR OUTCH
+0394 F94F 5A                  DECB 
+0395 F950 26 EE               BNE EDPASC
+0396 F952 20 BC               BRA NXTLIN
+0397                         *
+0398                         ** GO TO SPECIFIED ADDRESS (SET PC AND CONTINUE)
+0399                         *
+0400 F954 17 01 DF           GO      LBSR   ALTPC1    SET UP NEW PC
+0401 F957 28 01                      BVC    CONTIN    ADDRESS OK, GO
+0402 F959 39                         RTS              NOT OK, BOMB OUT
+0403 F95A 1F 34              CONTIN  TFR U,S
+0404 F95C 3B                 RTI     RTI
+0405                         *
+0406                         ** CHANGE OUTPUT DEVICE
+0407                         *
+0408 F95D 5F                 SETOUT CLRB DISABLE ALL
+0409 F95E 17 02 CB           SETOU1 LBSR INCH GET ARGUMENT
+0410 F961 81 53               CMPA #'S SERIAL ?
+0411 F963 26 07               BNE SETOU2
+0412 F965 17 02 F9            LBSR ACINIZ YES,INITIATE
+0413 F968 DA 02               ORB SERBIT YES, SET BIT
+0414 F96A 20 F2               BRA SETOU1
+0415                         
+0416 F96C                    SETOU2 EQU *
+0417                          IFD VIDOPT
+0418                          CMPA #'V VIDEO ?
+0419                          BNE SETOU3
+0420                          LBSR VINIZ
+0421                          ORB #VIDBIT
+0422                          BRA SETOU1
+0423                         
+0424                          ENDIF VIDOPT
+0424                          ENDIF VIDOPT
+0425 F96C                    SETOU3 EQU *
+0426                          IFD PRTOPT
+0427 F96C 81 50               CMPA #'P PRINTER ?
+0428 F96E 26 07               BNE SETOU4
+0429 F970 17 03 10            LBSR PINIZ
+0430 F973 CA 04               ORB #PRTBIT
+0431 F975 20 E7               BRA SETOU1
+0432                         
+0433                          ENDIF PRTOPT
+0434 F977 F7 F0 D3           SETOU4 STB OUTFLG SET UP FLAG
+0435 F97A 39                  RTS
+0436                         *
+0437                         ** "B" SET BREAKPOINT
+0438                         *
+0439 F97B 17 01 4C           BRKPNT LBSR IN1ADR
+0440 F97E 29 1E               BVS EXITBP
+0441 F980 8C F0 C0            CMPX #STACK
+0442 F983 24 1A               BCC BPERR
+0443 F985 34 10               PSHS X
+0444 F987 8E FF FF            LDX #$FFFF
+0445 F98A 8D 55               BSR BPTEST
+0446 F98C 35 10               PULS X
+0447 F98E 27 0F               BEQ BPERR
+0448 F990 A6 84               LDA ,X
+0449 F992 81 3F               CMPA #$3F
+0450 F994 27 09               BEQ BPERR
+0451 F996 A7 A0               STA ,Y+
+0452 F998 AF A4               STX ,Y
+0453 F99A 86 3F               LDA #$3F
+0454 F99C A7 84               STA ,X
+0455 F99E 39                 EXITBP RTS
+0456                         *
+0457 F99F 17 01 69           BPERR LBSR OUT1S
+0458 F9A2 86 3F               LDA #$3F
+0459 F9A4 16 02 A7            LBRA OUTCH
+0460 F9A7 10 8E F0 D4        XBKPNT LDY #BPTBL
+0461 F9AB C6 08               LDB #$08
+0462 F9AD 8D 18              XBPLP BSR RPLSWI
+0463 F9AF 5A                  DECB 
+0464 F9B0 26 FB               BNE XBPLP
+0465 F9B2 39                  RTS
+0466                         *
+0467                         ** SWI ENTRY POINT
+0468                         *
+0469 F9B3 1F 43              SWIE TFR S,U
+0470 F9B5 AE 4A               LDX $0A,U
+0471 F9B7 30 1F               LEAX -$01,X
+0472 F9B9 8D 26               BSR BPTEST
+0473 F9BB 27 04               BEQ REGPR
+0474 F9BD AF 4A               STX $0A,U
+0475 F9BF 8D 06               BSR RPLSWI
+0476 F9C1 17 01 AC           REGPR LBSR REGSTR
+0477 F9C4 16 FE 9B            LBRA NEXTCMD
+0478 F9C7 AE 21              RPLSWI LDX $01,Y
+0479 F9C9 8C F0 C0            CMPX #STACK
+0480 F9CC 24 0A               BHS FFSTBL
+0481 F9CE A6 84               LDA ,X
+0482 F9D0 81 3F               CMPA #$3F
+0483 F9D2 26 04               BNE FFSTBL
+0484 F9D4 A6 A4               LDA ,Y
+0485 F9D6 A7 84               STA ,X
+0486 F9D8 86 FF              FFSTBL LDA #$FF
+0487 F9DA A7 A0               STA ,Y+
+0488 F9DC A7 A0               STA ,Y+
+0489 F9DE A7 A0               STA ,Y+
+0490 F9E0                    LRA EQU *
+0491 F9E0                    DUMRTS EQU *
+0492 F9E0 39                  RTS
+0493                         *
+0494 F9E1 10 8E F0 D4        BPTEST LDY #BPTBL
+0495 F9E5 C6 08               LDB #$08
+0496 F9E7 A6 A0              FNDBP LDA ,Y+
+0497 F9E9 AC A1               CMPX ,Y++
+0498 F9EB 27 04               BEQ BPADJ
+0499 F9ED 5A                  DECB 
+0500 F9EE 26 F7               BNE FNDBP
+0501 F9F0 39                  RTS
+0502 F9F1 31 3D              BPADJ LEAY -$03,Y
+0503 F9F3 39                  RTS
+0504                         *
+0505                         *
+0506                         ** "L" LOAD S1 FORMAT TAPE
+0507                         *
+0508 F9F4 86 11              LOAD LDA #$11
+0509 F9F6 8D 52               BSR LDOUTC
+0510 F9F8 7F F0 D2            CLR ECHO
+0511 F9FB 17 02 47           LOAD1 LBSR ECHON
+0512 F9FE 81 53              LOAD2 CMPA #$53
+0513 FA00 26 F9               BNE LOAD1
+0514 FA02 17 02 40            LBSR ECHON
+0515 FA05 81 39               CMPA #$39
+0516 FA07 27 3C               BEQ LOAD21
+0517 FA09 81 31               CMPA #$31
+0518 FA0B 26 F1               BNE LOAD2
+0519 FA0D 17 00 CA            LBSR BYTE
+0520 FA10 34 02               PSHS A
+0521 FA12 29 26               BVS LODERR
+0522 FA14 17 00 B3            LBSR IN1ADR
+0523 FA17 29 21               BVS LODERR
+0524 FA19 34 10               PSHS X
+0525 FA1B E6 E0               LDB ,S+
+0526 FA1D EB E0               ADDB ,S+
+0527 FA1F EB E4               ADDB ,S
+0528 FA21 6A E4               DEC ,S
+0529 FA23 6A E4               DEC ,S
+0530 FA25 34 04              LOAD10 PSHS B
+0531 FA27 17 00 B0            LBSR BYTE
+0532 FA2A 35 04               PULS B
+0533 FA2C 29 0C               BVS LODERR
+0534 FA2E 34 02               PSHS A
+0535 FA30 EB E0               ADDB ,S+
+0536 FA32 6A E4               DEC ,S
+0537 FA34 27 05               BEQ LOAD16
+0538 FA36 A7 80               STA ,X+
+0539 FA38 20 EB               BRA LOAD10
+0540                         *
+0541 FA3A 5F                 LODERR CLRB
+0542 FA3B 35 02              LOAD16 PULS A
+0543 FA3D C1 FF               CMPB #$FF
+0544 FA3F 27 B3               BEQ LOAD
+0545 FA41 86 3F               LDA #$3F
+0546 FA43 8D 05               BSR LDOUTC
+0547 FA45 73 F0 D2           LOAD21 COM ECHO
+0548 FA48 86 13               LDA #$13
+0549 FA4A 16 02 01           LDOUTC LBRA OUTCH
+0550                         *
+0551                         ** "P" PUNCH S1 FORMAT TAPE
+0552                         *
+0553 FA4D 6F E2              PUNCH CLR ,-S
+0554 FA4F 8D 6F               BSR IN2ADR
+0555 FA51 34 30               PSHS Y,X
+0556 FA53 29 4A               BVS PUNEXT
+0557 FA55 AC 62               CMPX $02,S
+0558 FA57 25 46               BCS PUNEXT
+0559 FA59 30 01               LEAX $01,X
+0560 FA5B AF E4               STX ,S
+0561 FA5D 86 12               LDA #$12
+0562 FA5F 17 01 EC            LBSR OUTCH
+0563 FA62 EC E4              PUNCH2 LDD ,S
+0564 FA64 A3 62               SUBD $02,S
+0565 FA66 27 06               BEQ PUNCH3
+0566 FA68 10 83 00 20         CMPD #$0020
+0567 FA6C 23 02               BLS PUNCH4
+0568 FA6E C6 20              PUNCH3 LDB #$20
+0569 FA70 E7 64              PUNCH4 STB $04,S
+0570 FA72 8E FD CC            LDX #S1MSG
+0571 FA75 17 01 9E            LBSR PSTRNG
+0572 FA78 CB 03               ADDB #$03
+0573 FA7A 1F 98               TFR B,A
+0574 FA7C 17 01 81            LBSR OUT2H
+0575 FA7F AE 62               LDX $02,S
+0576 FA81 17 01 74            LBSR OUT4H
+0577 FA84 EB 62               ADDB $02,S
+0578 FA86 EB 63               ADDB $03,S
+0579 FA88 EB 84              PUNCHL ADDB ,X
+0580 FA8A A6 80               LDA ,X+
+0581 FA8C 17 01 71            LBSR OUT2H
+0582 FA8F 6A 64               DEC $04,S
+0583 FA91 26 F5               BNE PUNCHL
+0584 FA93 53                  COMB 
+0585 FA94 1F 98               TFR B,A
+0586 FA96 17 01 67            LBSR OUT2H
+0587 FA99 AF 62               STX $02,S
+0588 FA9B AC E4               CMPX ,S
+0589 FA9D 26 C3               BNE PUNCH2
+0590 FA9F 86 14              PUNEXT LDA #$14
+0591 FAA1 8D 6A               BSR OUT1C
+0592 FAA3 32 65               LEAS $05,S
+0593 FAA5 39                  RTS
+0594                         *
+0595                         ** MEMORY BLOCK MOVE
+0596                         *
+0597 FAA6 8D 18              BLKMOV BSR IN2ADR GET START AND END
+0598 FAA8 29 15               BVS BLKMV3 BAD ENTRY
+0599 FAAA 34 10               PSHS X SAVE SRC END
+0600 FAAC 86 3E               LDA #'>
+0601 FAAE 8D 5D               BSR OUT1C
+0602 FAB0 8D 18               BSR IN1ADR GET DESTINATION
+0603 FAB2 29 09               BVS BLKMV2 ERROR IN DEST
+0604 FAB4 A6 A0              BLKMV1 LDA ,Y+ GET BYTE
+0605 FAB6 A7 80               STA ,X+ STORE IT
+0606 FAB8 10 AC E4            CMPY ,S REACH END ADDRESS
+0607 FABB 26 F7               BNE BLKMV1
+0608 FABD 35 10              BLKMV2 PULS X RESTORE STACK
+0609 FABF 39                 BLKMV3 RTS
+0610                         *
+0611                         ** GET TWO VALID ADDRESSES
+0612                         *
+0613 FAC0 8D 08              IN2ADR BSR IN1ADR
+0614 FAC2 29 42               BVS NOTHEX
+0615 FAC4 1F 12               TFR X,Y
+0616 FAC6 86 2D               LDA #$2D
+0617 FAC8 8D 43               BSR OUT1C
+0618                         *
+0619                         ** GET ONE ADDRESS
+0620                         *
+0621 FACA 8D 0E              IN1ADR BSR BYTE
+0622 FACC 29 38               BVS NOTHEX
+0623 FACE 1F 01               TFR D,X
+0624 FAD0 8D 08               BSR BYTE
+0625 FAD2 29 32               BVS NOTHEX
+0626 FAD4 34 10               PSHS X
+0627 FAD6 A7 61               STA $01,S
+0628 FAD8 35 90               PULS X,PC
+0629                         *
+0630                         ** READ A HEX BYTE
+0631                         *
+0632 FADA 8D 11              BYTE BSR INHEX
+0633 FADC 29 28               BVS NOTHEX
+0634 FADE 48                  ASLA 
+0635 FADF 48                  ASLA 
+0636 FAE0 48                  ASLA 
+0637 FAE1 48                  ASLA 
+0638 FAE2 1F 89               TFR A,B
+0639 FAE4 8D 07               BSR INHEX
+0640 FAE6 29 1E               BVS NOTHEX
+0641 FAE8 34 04               PSHS B
+0642 FAEA AB E0               ADDA ,S+
+0643 FAEC 39                  RTS
+0644                         *
+0645                         ** READ A SINGLE HEX DIGIT
+0646                         *
+0647 FAED 17 01 55           INHEX LBSR ECHON
+0648 FAF0 81 30               CMPA #$30
+0649 FAF2 25 12               BCS NOTHEX
+0650 FAF4 81 39               CMPA #$39
+0651 FAF6 22 03               BHI INHEXA
+0652 FAF8 80 30               SUBA #$30
+0653 FAFA 39                  RTS
+0654                         *
+0655 FAFB 81 41              INHEXA CMPA #$41
+0656 FAFD 25 07               BCS NOTHEX
+0657 FAFF 81 46               CMPA #$46
+0658 FB01 22 03               BHI NOTHEX
+0659 FB03 80 37               SUBA #$37
+0660 FB05 39                  RTS
+0661                         *
+0662 FB06 1A 02              NOTHEX ORCC #$02
+0663 FB08 39                  RTS
+0664                         *
+0665 FB09 8D 00              OUT2S BSR OUT1S
+0666 FB0B 86 20              OUT1S LDA #$20
+0667 FB0D 16 01 3E           OUT1C LBRA OUTCH
+0668                         *
+0669                         ** ALTER X INDEX REGISTER
+0670                         *
+0671 FB10 17 00 85           ALTRX LBSR PRTIX
+0672 FB13 8D F6               BSR OUT1S
+0673 FB15 8D B3               BSR IN1ADR
+0674 FB17 29 02               BVS ALTXD
+0675 FB19 AF 44               STX $04,U
+0676 FB1B 39                 ALTXD RTS
+0677                         *
+0678                         ** ALTER A ACCUMULATOR
+0679                         *
+0680 FB1C 17 00 83           ALTRA LBSR PRTA
+0681 FB1F 8D EA               BSR OUT1S
+0682 FB21 8D B7               BSR BYTE
+0683 FB23 29 02               BVS ALTAD
+0684 FB25 A7 41               STA $01,U
+0685 FB27 39                 ALTAD RTS
+0686                         *
+0687                         ** ALTER DIRECT PAGE REGISTER
+0688                         *
+0689 FB28 17 00 80           ALTRDP LBSR PRTDP
+0690 FB2B 8D DE               BSR OUT1S
+0691 FB2D 8D AB               BSR BYTE
+0692 FB2F 29 02               BVS ALTDPD
+0693 FB31 A7 43               STA $03,U
+0694 FB33 39                 ALTDPD RTS
+0695                         *
+0696                         ** ALTER PROGRAM COUNTER
+0697                         *
+0698 FB34 8D 7E              ALTRPC BSR PRTPC
+0699 FB36 8D D3              ALTPC1 BSR OUT1S
+0700 FB38 8D 90               BSR IN1ADR
+0701 FB3A 29 02               BVS ALTPCD
+0702 FB3C AF 4A               STX $0A,U
+0703 FB3E 39                 ALTPCD RTS
+0704                         *
+0705                         ** ALTER U STACK POINTER
+0706                         *
+0707 FB3F 8D 7C              ALTRU BSR PRTUP
+0708 FB41 8D C8               BSR OUT1S
+0709 FB43 8D 85               BSR IN1ADR
+0710 FB45 29 02               BVS ALTUD
+0711 FB47 AF 48               STX $08,U
+0712 FB49 39                 ALTUD RTS
+0713                         *
+0714                         ** ALTER Y INDEX REGISTER
+0715                         *
+0716 FB4A 8D 7A              ALTRY BSR PRTIY
+0717 FB4C 8D BD               BSR OUT1S
+0718 FB4E 17 FF 79            LBSR IN1ADR
+0719 FB51 29 02               BVS ALTYD
+0720 FB53 AF 46               STX $06,U
+0721 FB55 39                 ALTYD RTS
+0722                         *
+0723                         ** ALTER B ACCUMULATOR
+0724                         *
+0725 FB56 8D 77              ALTRB BSR PRTB
+0726 FB58 8D B1               BSR OUT1S
+0727 FB5A 17 FF 7D            LBSR BYTE
+0728 FB5D 29 02               BVS ALTBD
+0729 FB5F A7 42               STA $02,U
+0730 FB61 39                 ALTBD RTS
+0731                         *
+0732                         ** ALTER CONDITION CODES
+0733                         *
+0734 FB62 8D 74              ALTRCC BSR PRTCC
+0735 FB64 8D A5               BSR OUT1S
+0736 FB66 17 FF 71            LBSR BYTE
+0737 FB69 29 04               BVS ALTCCD
+0738 FB6B 8A 80               ORA #$80
+0739 FB6D A7 C4               STA ,U
+0740 FB6F 39                 ALTCCD RTS
+0741                         *
+0742                         ** DUMP REGISTERS
+0743                         *
+0744 FB70 8E FD 8B           REGSTR LDX #SEPMSG
+0745 FB73 17 00 A0            LBSR PSTRNG
+0746 FB76 8D 16               BSR PRTSP
+0747 FB78 8D 1E               BSR PRTIX
+0748 FB7A 8D 26               BSR PRTA
+0749 FB7C 8D 2D               BSR PRTDP
+0750 FB7E 8D 34               BSR PRTPC
+0751 FB80 8E FD 8B            LDX #SEPMSG
+0752 FB83 17 00 90            LBSR PSTRNG
+0753 FB86 8D 35               BSR PRTUP
+0754 FB88 8D 3C               BSR PRTIY
+0755 FB8A 8D 43               BSR PRTB
+0756 FB8C 20 4A               BRA PRTCC
+0757                         *
+0758                         ** DISPLAY CONTENTS OF STACK
+0759                         *
+0760 FB8E 8E FD 8F           PRTSP LDX #SPMSG
+0761 FB91 17 00 91            LBSR PDATA
+0762 FB94 1F 31               TFR U,X
+0763 FB96 20 60               BRA OUT4H
+0764                         *
+0765 FB98 8E FD A7           PRTIX LDX #IXMSG
+0766 FB9B 17 00 87            LBSR PDATA
+0767 FB9E AE 44               LDX $04,U
+0768 FBA0 20 56               BRA OUT4H
+0769                         *
+0770 FBA2 8E FD B3           PRTA LDX #AMSG
+0771 FBA5 8D 7E               BSR PDATA
+0772 FBA7 A6 41               LDA $01,U
+0773 FBA9 20 55               BRA OUT2H
+0774                         *
+0775 FBAB 8E FD AD           PRTDP LDX #DPMSG
+0776 FBAE 8D 75               BSR PDATA
+0777 FBB0 A6 43               LDA $03,U
+0778 FBB2 20 4C               BRA OUT2H
+0779                         *
+0780 FBB4 8E FD 95           PRTPC LDX #PCMSG
+0781 FBB7 8D 6C               BSR PDATA
+0782 FBB9 AE 4A               LDX $0A,U
+0783 FBBB 20 3B               BRA OUT4H
+0784                         *
+0785 FBBD 8E FD 9B           PRTUP LDX #UPMSG
+0786 FBC0 8D 63               BSR PDATA
+0787 FBC2 AE 48               LDX $08,U
+0788 FBC4 20 32               BRA OUT4H
+0789                         *
+0790 FBC6 8E FD A1           PRTIY LDX #IYMSG
+0791 FBC9 8D 5A               BSR PDATA
+0792 FBCB AE 46               LDX $06,U
+0793 FBCD 20 29               BRA OUT4H
+0794                         *
+0795 FBCF 8E FD B8           PRTB LDX #BMSG
+0796 FBD2 8D 51               BSR PDATA
+0797 FBD4 A6 42               LDA $02,U
+0798 FBD6 20 28               BRA OUT2H
+0799                         *
+0800 FBD8 8E FD BD           PRTCC LDX #CCMSG
+0801 FBDB 8D 48               BSR PDATA
+0802 FBDD A6 C4               LDA ,U
+0803 FBDF 8E FD C4            LDX #REGMSG
+0804                         *
+0805                         ** BINARY TO ASCII CONVERSION
+0806                         *
+0807 FBE2 34 02              BIASCI PSHS A
+0808 FBE4 C6 08               LDB #$08
+0809 FBE6 A6 80              OUTBA LDA ,X+
+0810 FBE8 68 E4               ASL ,S
+0811 FBEA 25 02               BCS PRTBA
+0812 FBEC 86 2D               LDA #$2D
+0813 FBEE 8D 5E              PRTBA BSR OUTCH
+0814 FBF0 17 FF 18            LBSR OUT1S
+0815 FBF3 5A                  DECB 
+0816 FBF4 26 F0               BNE OUTBA
+0817 FBF6 35 82               PULS A,PC
+0818                         *
+0819                         ** OUTPUT A 4DIGIT HEX NUMBER
+0820                         *
+0821 FBF8 34 10              OUT4H PSHS X
+0822 FBFA 35 02               PULS A
+0823 FBFC 8D 02               BSR OUT2H
+0824 FBFE 35 02               PULS A
+0825                         *
+0826                         ** OUTPUT 2DIGIT HEX NUMBER
+0827                         *
+0828 FC00 34 02              OUT2H PSHS A
+0829 FC02 44                  LSRA 
+0830 FC03 44                  LSRA 
+0831 FC04 44                  LSRA 
+0832 FC05 44                  LSRA 
+0833 FC06 8D 04               BSR XASCII
+0834 FC08 35 02               PULS A
+0835 FC0A 84 0F               ANDA #$0F
+0836 FC0C 8B 30              XASCII ADDA #$30
+0837 FC0E 81 39               CMPA #$39
+0838 FC10 2F 02               BLE OUTC
+0839 FC12 8B 07               ADDA #$07
+0840 FC14 20 38              OUTC BRA OUTCH
+0841                         *
+0842                         ** PRINT CR, LF, STRING
+0843                         *
+0844 FC16 8D 02              PSTRNG BSR PCRLF
+0845 FC18 20 0B               BRA PDATA
+0846 FC1A 34 10              PCRLF PSHS X
+0847 FC1C 8E FD 7D            LDX #CRLFST
+0848 FC1F 8D 04               BSR PDATA
+0849 FC21 35 90               PULS X,PC
+0850                         *
+0851 FC23 8D 29              PRINT BSR OUTCH
+0852 FC25 A6 80              PDATA LDA ,X+
+0853 FC27 81 04               CMPA #$04
+0854 FC29 26 F8               BNE PRINT
+0855 FC2B 39                  RTS
+0856                         *
+0857                         ** INPUT CHARACTER WITH NO ECHO
+0858                         *
+0859 FC2C 34 10              INCH PSHS X
+0860 FC2E BE F0 D0            LDX CPORT
+0861 FC31 A6 84              GETSTA LDA ,X
+0862 FC33 85 01               BITA #$01
+0863 FC35 27 FA               BEQ GETSTA
+0864 FC37 A6 01               LDA $01,X
+0865 FC39 35 90               PULS X,PC
+0866                         *
+0867                         ** INPUT CHARACTER AND ECHO
+0868                         *
+0869 FC3B 34 02              INCHEK PSHS A
+0870 FC3D A6 9F F0 D0         LDA [CPORT]
+0871 FC41 85 01               BITA #$01
+0872 FC43 35 82               PULS A,PC
+0873                         *
+0874                         ** INPUT CHARACTER AND ECHO IFD FLAG SET
+0875                         *
+0876 FC45 7D F0 D2           ECHON TST ECHO
+0877 FC48 27 E2               BEQ INCH
+0878 FC4A 8D E0              INCHE BSR INCH
+0879 FC4C 84 7F               ANDA #$7F
+0880                         *
+0881                         ** OUTPUT CHARACTER IN ACCA
+0882                         ** FIRST DETERMINE WHICH OUTPUT ROUTINE(S) TO USE
+0883                         *
+0884 FC4E 34 04              OUTCH  PSHS   B
+0885 FC50 F6 F0 D3                   LDB    OUTFLG
+0886                          IFD PRTOPT
+0887 FC53 C5 04                      BITB   #PRTBIT
+0888 FC55 27 02                      BEQ OUTCH2
+0889 FC57 8D 54                      BSR POUTCH
+0890                          ENDIF PRTOPT
+0891 FC59 C5 02              OUTCH2  BITB   #SERBIT
+0892 FC5B 27 02                      BEQ    OUTCH3
+0893 FC5D 8D 15                      BSR   AOUTCH
+0894 FC5F                    OUTCH3 EQU *
+0895                          IFD VIDOPT
+0896                                 BITB   #VIDBIT
+0897                                 BEQ    OUTCH4
+0898                                 BSR   VOUTCH
+0899                          ENDIF VIDOPT
+0899                          ENDIF VIDOPT
+0900 FC5F 35 84              OUTCH4  PULS   B,PC
+0901                         *
+0902                         ** INITIATE ACIA
+0903                         *
+0904 FC61 BE F0 D0           ACINIZ LDX CPORT
+0905 FC64 86 03               LDA #$03
+0906 FC66 A7 84               STA ,X
+0907 FC68 86 11               LDA #$11
+0908 FC6A A7 84               STA ,X
+0909 FC6C 6D 01               TST $01,X
+0910 FC6E 86 FF               LDA #$FF
+0911 FC70 B7 F0 D2            STA ECHO
+0912 FC73 39                  RTS
+0913                         *
+0914                         ** OUTPUT CHARACTER TO CONTROL PORT
+0915                         *
+0916 FC74 34 14              AOUTCH PSHS B,X
+0917 FC76 BE F0 D0            LDX CPORT
+0918 FC79 E6 84              FETSTA LDB ,X
+0919 FC7B C5 02               BITB #$02
+0920 FC7D 27 FA               BEQ FETSTA
+0921 FC7F A7 01               STA $01,X
+0922 FC81 35 94               PULS B,X,PC
+0923                          IFD PRTOPT
+0924                         *
+0925                         ** PRINTER DRIVER ROUTINES
+0926                         *
+0927                         *
+0928                         ** PINIZ - INITIATE PRINTER PORT
+0929                         *
+0930 FC83 34 04              PINIZ PSHS B
+0931 FC85 CC 0C 04            LDD #DIRMSK*256+$04 ACCA=DIRMSK ACCB=$04
+0932 FC88 FD E4 04            STD PADATA SET DDR AND SELECT DATA
+0933                         *
+0934                         ** RESET PRINTER
+0935 FC8B C6 04               LDB #PRESET
+0936 FC8D F7 E4 04            STAB PADATA
+0937 FC90 5C                 RESTLP INCB DELAY FOR RESET
+0938 FC91 26 FD               BNE RESTLP
+0939 FC93 B7 E4 04            STAA PADATA ACCA=DIRMSK
+0940                         *
+0941                         ** INITALIZE PORT B (DATA PORT)
+0942 FC96 86 2A               LDAA #$2A
+0943 FC98 B7 E4 07            STAA PBCTRL
+0944 FC9B CC FF 2E            LDD #$FF2E ACCA=$FF ACCB =%00101110
+0945 FC9E FD E4 06            STD PBDATA PBDREG   PBCTRL
+0946                         *
+0947                         ** SELECT 66 LINES/PAGE
+0948 FCA1 86 1B               LDAA #$1B
+0949 FCA3 8D 08               BSR POUTCH
+0950 FCA5 86 43               LDAA #'C
+0951 FCA7 8D 04               BSR POUTCH
+0952 FCA9 86 42               LDAA #66
+0953 FCAB 35 04               PULS B
+0954                         *
+0955                         ** OUTPUT A CHARACTER TO THE PRINTER
+0956                         *
+0957 FCAD 34 04              POUTCH PSHS B
+0958 FCAF F6 E4 06            LDAB PBDATA CLEAR INTERRUPT BIT
+0959                         *
+0960                         ** WAIT TILL NOT BUSY
+0961 FCB2 F6 E4 04           BUSYLP LDAB PADATA
+0962 FCB5 C5 10               BITB #PERROR
+0963 FCB7 27 06               BEQ PEXIT
+0964 FCB9 5D                  TSTB
+0965 FCBA 2B F6               BMI BUSYLP
+0966                         *
+0967                         ** NOW OUTPUT CHARACTER
+0968 FCBC B7 E4 06            STAA PBDATA
+0969 FCBF 35 84              PEXIT PULS B,PC
+0970                         *
+0971                         ** PCHK TEST IFD PRINTER READY
+0972                         *
+0973 FCC1 7D E4 07           PCHK TST PBCTRL TEST STATE OF CRB7
+0974 FCC4 39                  RTS SET ON ACKNOWLEDGE
+0975                          ENDIF PRTOPT
+0976                          IFD VIDOPT
+0977                         ***************************************************
+0978                         *      TELEVIDEO-TYPE MEMORY-MAPPED EMULATOR      *
+0979                         *                                                 *
+0980                         * FOR HARD-WIRED MEMORY-MAPPED DISPLAYS USING THE *
+0981                         * HIGH ORDER BIT OF EACH BYTE FOR  REVERSE  VIDEO *
+0982                         * CURSORING  (SUCH  AS THE THOMAS INSTRUMENTATION *
+0983                         * 16x64 BOARD).                                   *
+0984                         ***************************************************
+0985                         
+0986                         ***************************************************
+0987                         *               INITIALIZE EMULATOR               *
+0988                         ***************************************************
+0989                         
+0990                         VINIZ   LDX    #0
+0991                                 STX    COLADX    AND ROWADX
+0992                                 STX    NEWROW    AND ESCFLG
+0993                                 LDX    #SCREEN   POINT TO SCREEN
+0994                                 STX    CURSOR    SET PROGRAM CURSOR
+0995                                 LDA    #$1B      SEND ESCAPE
+0996                                 BSR    VOUTCH
+0997                                 LDA    #'Y       CLEAR TO END OF SCREEN
+0998                         *
+0999                         ** VIDEO OUTPUT ROUTINE
+1000                         *
+1001                         VOUTCH  PSHS   A,B,X     SAVE REGISTERS
+1002                         *
+1003                         ** CLEAR CURSOR
+1004                                 LDX    CURSOR
+1005                                 LDB   0,X
+1006                                 ANDB   #$7F
+1007                                 STB   0,X
+1008                         *
+1009                         ** CHECK FOR ESCAPE SEQUENCE
+1010                                 TST    ESCFLG    ESCAPE ACTIVE?
+1011                                 BEQ    SOROU1    BRANCH IFD NOT
+1012                                 BSR   ESCAPE    ELSE DO ESCAPE
+1013                                 BRA    RETURN    AND RETURN
+1014                         *
+1015                         ** CHECK FOR CONTROL CHARACTERS
+1016                         SOROU1  CMPA   #$20      CONTROL CODES?
+1017                                 BHS    SOROU2
+1018                                 BSR    CONTRL    BRANCH IFD SO
+1019                                 BRA    RETURN
+1020                         *
+1021                         ** OUTPUT TEXT CHARACTER
+1022                         SOROU2  LDX    CURSOR    ELSE GET CURSOR
+1023                                 STAA   0,X       DISPLAY CHARACTER
+1024                                 LBSR   NEWCOL    UPDATE COLUMN
+1025                         *
+1026                         ** DISPLAY CURSOR AND RETURN
+1027                         RETURN  LDX    CURSOR    AND DISPLAY IT
+1028                                 LDB   X
+1029                                 ORAB   #$80      WITH REVID
+1030                                 STB   X
+1031                                 PULS   A,B,X,PC  RESTORE REGISTERS AND RETURN
+1032                         
+1033                         ***************************************************
+1034                         *              CONTROL CODE HANDLERS              *
+1035                         ***************************************************
+1036                         
+1037                         CONTRL  CMPA   #$08      BACKSPACE ?
+1038                                 BEQ    BACKSP
+1039                                 CMPA   #$D       RETURN?
+1040                                 LBEQ   CRETN
+1041                                 CMPA   #$1B      ESCAPE SEQUENCE?
+1042                                 BEQ    SETESC
+1043                                 CMPA   #$0A      LINE FEED ?
+1044                                 BNE    RETESC    NONE OF THESE, RETURN
+1045                         
+1046                         ***************************************** LINE FEED
+1047                         
+1048                         LINEFD  LDD    COLADX    GET CURRENT COLUMN AND ROW
+1049                                 INCB             BUMP ROW
+1050                                 CMPB   #NUMLIN   SCROLL TIME?
+1051                                 LBNE   NEWCUR    POSITION CURSOR IFD NOT
+1052                                 LBRA   SCROLL    ELSE SCROLL IT
+1053                         
+1054                         *********************************** BACK SPACE
+1055                         
+1056                         BACKSP  LDA    COLADX
+1057                                 BEQ    RETESC      RETURN
+1058                                 DECA
+1059                                 LBRA   POSCOL    POSITION CURSOR
+1060                         
+1061                         ***************************************************
+1062                         *                 ESCAPE HANDLERS                 *
+1063                         ***************************************************
+1064                         
+1065                         ESCAPE  LDAB   ESCFLG    GET FLAG
+1066                                 CMPB   #'=       SETTING CURSOR?
+1067                                 BEQ    ESCCUR    BRANCH IFD SO
+1068                                 CMPA   #'Y       CLEAR TO END OF SCREEN?
+1069                                 LBEQ   ESCCLS
+1070                                 CMPA   #'T       CLEAR TO END OF LINE?
+1071                                 BEQ   ESCCLL
+1072                                 CMPA   #'E       INSERT LINE?
+1073                                 BEQ   ESCINL
+1074                                 CMPA   #'R       DELETE LINE?
+1075                                 BEQ   ESCDLL
+1076                                 CMPA   #'=       STARTING CURSOR SET?
+1077                                 BNE    CLRESC    BRANCH IFD NOT
+1078                         
+1079                         ***************************** START ESCAPE SEQUENCE
+1080                         
+1081                         SETESC  STAA   ESCFLG    ELSE START CURSORING
+1082                                 RTS              AND RETURN
+1083                         
+1084                         CLRESC  CLR    ESCFLG    NO OTHERS SUPPORTED
+1085                         RETESC  RTS              SO RETURN
+1086                         
+1087                         ********************************* SET SCREEN CURSOR
+1088                         
+1089                         ESCCUR  TST    NEWROW    ROW SET?
+1090                                 BNE    ESCCU1    BRANCH IFD SO
+1091                                 STAA   NEWROW    ELSE SET NEW ROW
+1092                                 RTS              AND RETURN
+1093                         
+1094                         ESCCU1  CLR    ESCFLG
+1095                                 SUBA   #$20      ADJUST COLUMN ADDRESS
+1096                                 CMPA   #LINLEN-1 CHECK FOR ACCEPTABLE COLUM
+1097                                 BHI    RETESC    NOT OK, DO NOTHING
+1098                         
+1099                         ESCCU2  LDAB   NEWROW
+1100                                 CLR    NEWROW
+1101                                 SUBB   #$20      ADJUST TO ROW ADDRESS
+1102                                 CMPB   #NUMLIN-1 CHECK FOR ACCEPTABLE ROW
+1103                                 BHI    RETESC    ELSE RETURN DOING NOTHING
+1104                                 BRA   NEWCUR    GO SET NEW CURSOR IFD SO
+1105                         *
+1106                         *************************** DELETE LINE FROM SCREEN
+1107                         
+1108                         ESCDLL  BSR    CRETN     GO COL. ZERO
+1109                                 LDB    ROWADX
+1110                                 CMPB   #NUMLIN-1
+1111                                 BEQ   SCROL3
+1112                                 BRA   SCROL1    AND DELETE THIS LINE
+1113                         
+1114                         *************************** INSERT LINE INTO SCREEN
+1115                         
+1116                         ESCINL  BSR    CRETN    GO TO COL. ZERO
+1117                                 LDAB   ROWADX
+1118                                 CMPB   #NUMLIN-1
+1119                                 BEQ    ESCCLL
+1120                         *
+1121                         ** SCROLL SCREEN DOWN FROM CURSOR
+1122                         *
+1123                                 LDX    #SCREEN+SCNLEN-LINLEN
+1124                         ESCIN0  LDAA   0,-X
+1125                                 STAA   LINLEN,X
+1126                                 LDA    SCNLEN,X
+1127                                 STA    SCNLEN+LINLEN,X
+1128                                 CPX    CURSOR
+1129                                 BNE    ESCIN0
+1130                         
+1131                         ****************** CLEAR FROM CURSOR TO END OF LINE
+1132                         
+1133                         ESCCLL  LDA    COLADX    GET CURRENT COLUMN
+1134                                 LDX    CURSOR    GET CURSOR
+1135                                 LDB    #$20      AND CLEAR CHAR
+1136                         ESCLL1  STB    SCNLEN,X  CLEAR ATTRIBUTE
+1137                                 STB    ,X+       CLEAR TEXT
+1138                                 INCA
+1139                                 CMPA   #LINLEN   UNTIL END OF LINE
+1140                                 BNE    ESCLL1
+1141                                 CLR    ESCFLG
+1142                                 RTS
+1143                         
+1144                         *********************************** CARRIAGE RETURN
+1145                         
+1146                         CRETN   CLRA               SET COLUMN ZERO
+1147                         POSCOL  LDB    ROWADX    GET CURRENT ROW
+1148                         
+1149                         *********** GENERATE NEW CURSOR POSITION AND RETURN
+1150                         
+1151                         NEWCUR  STD    COLADX    SAVE NEW ROW AND COLUMN
+1152                                 LDA    #LINLEN   ELSE ADD A LINE
+1153                                 MUL              LINLEN * ROWADX
+1154                                 ADDB   COLADX
+1155                                 ADCA   #0
+1156                                 ADDD   #SCREEN   ADD SCREEN BASE.
+1157                                 STD    CURSOR    SAVE NEW CURSOR
+1158                                 TFR    D,X       GET CURSOR IN X
+1159                                 RTS              AND RETURN
+1160                         
+1161                         ********************* UPDATE CURRENT COLUMN AND ROW
+1162                         
+1163                         NEWCOL  LDD    COLADX    GET ROW AND COLUMN
+1164                                 INCA             BUMP COLUMN
+1165                                 CMPA   #LINLEN   ROLL?
+1166                                 BNE    NEWCUR    BRANCH IFD NOT
+1167                                 CLRA             ELSE RESET TO ZERO
+1168                                 INCB             AND BUMP ROW
+1169                                 CMPB   #NUMLIN
+1170                                 BNE    NEWCUR
+1171                                 DECB             BOTTOM ROW
+1172                                 BSR    NEWCUR
+1173                         
+1174                         ********************************* SCROLL THE SCREEN
+1175                         
+1176                         SCROLL  LDX    #SCREEN   POINT TO SCREEN
+1177                         SCROL1  LDA    SCNLEN+LINLEN,X
+1178                                 STA    SCNLEN,X
+1179                                 LDAA   LINLEN,X  MOVE TWO BYTES
+1180                                 STAA   0,X+      UP ONE LINE
+1181                                 CMPX   #SCREEN+SCNLEN-LINLEN
+1182                                 BNE    SCROL1    LOOP UNTIL DONE
+1183                                 BRA SCROL3
+1184                         
+1185                         **************** CLEAR FROM CURSOR TO END OF SCREEN
+1186                         
+1187                         ESCCLS  LDX    CURSOR    GET CURSOR
+1188                         SCROL3  LDAA   #$20      GET A SPACE
+1189                         SCROL2  STA    SCNLEN,X  CLEAR ATTRIBUTES
+1190                                 STA    ,X+       AND TEXT
+1191                                 CMPX   #SCREEN+SCNLEN
+1192                                 BNE    SCROL2    UNTIL DONE
+1193                                 CLR    ESCFLG
+1194                              RTS
+1195                          ENDIF VIDOPT
+1195                          ENDIF VIDOPT
+1196                          IFD FDCOPT
+1197                         *
+1198                         ** "D" MINI DISK BOOT
+1199                         *
+1200 FCC5 7D E0 18           MINBOOT TST CMDREG
+1201 FCC8 7F E0 14            CLR DRVREG
+1202 FCCB 8E 00 00            LDX #$0000
+1203 FCCE 30 01              LOOP LEAX $01,X
+1204 FCD0 8C 00 00            CMPX #$0000
+1205 FCD3 26 F9               BNE LOOP
+1206 FCD5 86 0F               LDA #$0F
+1207 FCD7 B7 E0 18            STA CMDREG
+1208 FCDA 8D 37               BSR DELAY
+1209 FCDC F6 E0 18           LOOP1 LDB CMDREG
+1210 FCDF C5 01               BITB #$01
+1211 FCE1 26 F9               BNE LOOP1
+1212 FCE3 86 01               LDA #$01
+1213 FCE5 B7 E0 1A            STA SECREG
+1214 FCE8 8D 29               BSR DELAY
+1215 FCEA 86 8C               LDA #$8C
+1216 FCEC B7 E0 18            STA CMDREG
+1217 FCEF 8D 22               BSR DELAY
+1218 FCF1 8E C0 00            LDX #$C000
+1219 FCF4 20 09               BRA LOOP3
+1220 FCF6 C5 02              LOOP2 BITB #$02
+1221 FCF8 27 05               BEQ LOOP3
+1222 FCFA B6 E0 1B            LDA DATREG
+1223 FCFD A7 80               STA ,X+
+1224 FCFF F6 E0 18           LOOP3 LDB CMDREG
+1225 FD02 C5 01               BITB #$01
+1226 FD04 26 F0               BNE LOOP2
+1227 FD06 C5 2C               BITB #$2C
+1228 FD08 27 01               BEQ LOOP4
+1229 FD0A 39                  RTS
+1230                         *
+1231 FD0B 8E C0 00           LOOP4 LDX #$C000
+1232 FD0E AF 4A               STX $0A,U
+1233 FD10 1F 34               TFR U,S
+1234 FD12 3B                  RTI 
+1235                         *
+1236 FD13 C6 04              DELAY LDB #$04
+1237 FD15 5A                 LOOP5 DECB
+1238 FD16 26 FD               BNE LOOP5
+1239 FD18 39                  RTS
+1240                          ENDIF FDCOPT
+1241                         *
+1242                         ** COMMAND JUMP TABLE
+1243                         *
+1244 FD19 01                 JMPTAB FCB $01
+1245 FD1A FB 1C               FDB ALTRA
+1246 FD1C 02                  FCB $02
+1247 FD1D FB 56               FDB ALTRB
+1248 FD1F 03                  FCB $03
+1249 FD20 FB 62               FDB ALTRCC
+1250 FD22 04                  FCB $04
+1251 FD23 FB 28               FDB ALTRDP
+1252 FD25 10                  FCB $10
+1253 FD26 FB 34               FDB ALTRPC
+1254 FD28 15                  FCB $15
+1255 FD29 FB 3F               FDB ALTRU
+1256 FD2B 18                  FCB $18
+1257 FD2C FB 10               FDB ALTRX
+1258 FD2E 19                  FCB $19
+1259 FD2F FB 4A               FDB ALTRY
+1260                         *
+1261 FD31 42                  FCC "B"
+1262 FD32 F9 7B               FDB BRKPNT
+1263                          IFD FDCOPT
+1264 FD34 44                  FCC "D"
+1265 FD35 FC C5               FDB MINBOOT
+1266                          ENDIF FDCOPT
+1267 FD37 45                  FCC "E"
+1268 FD38 F8 F5               FDB MEMDUMP
+1269 FD3A 47                  FCC "G"
+1270 FD3B F9 54               FDB GO
+1271 FD3D 4C                  FCC "L"
+1272 FD3E F9 F4               FDB LOAD
+1273 FD40 4D                  FCC "M"
+1274 FD41 F8 A0               FDB MEMCHG
+1275 FD43 4F                  FCC "O"
+1276 FD44 F9 5D               FDB SETOUT
+1277 FD46 50                  FCC "P"
+1278 FD47 FA 4D               FDB PUNCH
+1279 FD49 52                  FCC "R"
+1280 FD4A FB 70               FDB REGSTR
+1281 FD4C 53                  FCC "S"
+1282 FD4D F8 E9               FDB DISSTK
+1283                          IFD CLKOPT
+1284 FD4F 54                  FCC "T"
+1285 FD50 FD DC               FDB TIMSET
+1286                          ENDIF CLKOPT
+1287 FD52 58                  FCC "X"
+1288 FD53 F9 A7               FDB XBKPNT
+1289 FD55 5A                  FCC "Z"
+1290 FD56 FA A6               FDB BLKMOV
+1291                         *
+1292 FD58 F9 5C              RAMVEC FDB RTI
+1293 FD5A F9 5C               FDB RTI
+1294 FD5C F9 5C               FDB RTI
+1295 FD5E F9 5C               FDB RTI
+1296 FD60 F9 5C               FDB RTI
+1297 FD62 F9 B3               FDB SWIE
+1298 FD64 FF FF               FDB $FFFF
+1299 FD66 FF FF               FDB $FFFF
+1300                         *
+1301                         ** CHARATER STRINGS
+1302                         *
+1303 FD68 00                 TTLMSG FCB $00
+1304 FD69 00                  FCB $00
+1305 FD6A 00                  FCB $00
+1306 FD6B 0D                  FCB $0D
+1307 FD6C 0A                  FCB $0A
+1308 FD6D 00                  FCB $00
+1309 FD6E 00                  FCB $00
+1310 FD6F 00                  FCB $00
+1311 FD70 4B 2D 42 55 47 39   FCC "K-BUG9 V1.0 "
+          20 56 31 2E 30 20
+1312 FD7C 04                  FCB $04
+1313                         *
+1314 FD7D 0D                 CRLFST FCB $0D
+1315 FD7E 0A                  FCB $0A
+1316 FD7F 00                  FCB $00
+1317 FD80 00                  FCB $00
+1318 FD81 00                  FCB $00
+1319 FD82 04                  FCB $04
+1320                         *
+1321 FD83 3E                 PMTMSG FCC ">"
+1322 FD84 04                  FCB $04
+1323 FD85 57 48 41 54 3F     QRYMSG FCC "WHAT?"
+1324 FD8A 04                  FCB $04
+1325 FD8B 20 2D 20           SEPMSG FCC " - "
+1326 FD8E 04                  FCB $04
+1327                         *
+1328 FD8F 20 20 53 50 3D     SPMSG FCC "  SP="
+1329 FD94 04                  FCB $04
+1330 FD95 20 20 50 43 3D     PCMSG FCC "  PC="
+1331 FD9A 04                  FCB $04
+1332 FD9B 20 20 55 50 3D     UPMSG FCC "  UP="
+1333 FDA0 04                  FCB $04
+1334 FDA1 20 20 49 59 3D     IYMSG FCC "  IY="
+1335 FDA6 04                  FCB $04
+1336 FDA7 20 20 49 58 3D     IXMSG FCC "  IX="
+1337 FDAC 04                  FCB $04
+1338 FDAD 20 20 44 50 3D     DPMSG FCC "  DP="
+1339 FDB2 04                  FCB $04
+1340 FDB3 20 20 41 3D        AMSG FCC "  A="
+1341 FDB7 04                  FCB $04
+1342 FDB8 20 20 42 3D        BMSG FCC "  B="
+1343 FDBC 04                  FCB $04
+1344 FDBD 20 20 43 43 3A 20  CCMSG FCC "  CC: "
+1345 FDC3 04                  FCB $04
+1346                         *
+1347 FDC4 45 46 48 49 4E 5A  REGMSG FCC "EFHINZVC"
+          56 43
+1348 FDCC 53 31              S1MSG FCC "S1"
+1349 FDCE 04                  FCB $04
+1350                          IFD CLKOPT
+1351                         *
+1352                         * CLOCK INTER FACE UTILITY
+1353                         *
+1354                         * TIME <Hours> <Minuits> <Seconds>
+1355                         * If no argument is specified, the current time
+1356                         * will be displayed.
+1357                         *
+1358                         * READ A REGISTER FROM THE COUNTER.
+1359                         * The X Index rgister points to the register
+1360                         * to be read. The Status Register is checked
+1361                         * before and after the register is read before
+1362                         * returning a value in accumulator A
+1363                         *
+1364 FDCF 7D E0 54           RDCLK  TST CLKSTA
+1365 FDD2 26 FB                     BNE RDCLK
+1366 FDD4 A6 84              RDCLK1 LDA 0,X
+1367 FDD6 7D E0 54                  TST CLKSTA
+1368 FDD9 26 F9                     BNE RDCLK1
+1369 FDDB 39                        RTS
+1370                         *
+1371                         * MAIN PROGRAM:
+1372                         *
+1373 FDDC 8E E0 40           TIMSET LDX #COUNTR POINT TO TIMER
+1374 FDDF 17 FC F8                 LBSR BYTE READ HOURS
+1375 FDE2 29 16                    BVS  SHOWTM NO ARG, DISP TIME
+1376 FDE4 A7 04                    STA HOUR,X
+1377 FDE6 17 FD 22                 LBSR OUT1S
+1378 FDE9 17 FC EE                 LBSR BYTE READ MINUITES
+1379 FDEC 29 0C                    BVS  SHOWTM
+1380 FDEE A7 03                    STA MINUIT,X
+1381 FDF0 17 FD 18                 LBSR OUT1S
+1382 FDF3 17 FC E4                 LBSR BYTE SECONDS.
+1383 FDF6 29 02                    BVS SHOWTM
+1384 FDF8 A7 02                    STA SECOND,X
+1385                         *
+1386                         * DISPLAY CURRENT TIME
+1387                         *
+1388 FDFA 17 FE 1D           SHOWTM LBSR PCRLF
+1389 FDFD 8E E0 44                  LDX #COUNTR+HOUR
+1390 FE00 C6 03                     LDB #3
+1391 FE02 8D CB              SHOWLP BSR RDCLK
+1392 FE04 17 FD F9                  LBSR OUT2H
+1393 FE07 86 3A                     LDA #':
+1394 FE09 17 FE 42                  LBSR OUTCH
+1395 FE0C 30 1F                     LEAX -1,X
+1396 FE0E 5A                        DECB
+1397 FE0F 26 F1                     BNE SHOWLP
+1398 FE11 39                        RTS
+1399                         *
+1400                         * INITIATE CLOCK.
+1401                         * MASK INTERRUPTS.
+1402                         *
+1403 FE12 7F E0 51           CLKINZ CLR CINTCR  MASK ALL INTERRUPTS
+1404 FE15 7D E0 50                  TST CINTSR  CLEAR ANY INTERRUPTS
+1405 FE18 39                        RTS
+1406                          ENDIF CLKOPT
+1407 FFB2                     ORG ROM+$07B2
+1408                         *
+1409                         ** INTERRUPT JUMP TABLE
+1410                         *
+1411 FFB2 6E 9F F0 C0        V1 JMP [STACK]
+1412 FFB6 6E 9F F0 C4        V2 JMP [SWI2]
+1413 FFBA 6E 9F F0 C6        V3 JMP [FIRQ]
+1414 FFBE 6E 9F F0 C8        V4 JMP [IRQ]
+1415 FFC2 6E 9F F0 CA        V5 JMP [SWI]
+1416                         *
+1417                         ** SPECIAL CALL TO MONITOR
+1418                         *
+1419 FFC6 1F 43              SWI3E TFR S,U
+1420 FFC8 AE 4A               LDX $0A,U
+1421 FFCA E6 80               LDB ,X+
+1422 FFCC AF 4A               STX $0A,U
+1423 FFCE 4F                  CLRA
+1424 FFCF 58                  ASLB 
+1425 FFD0 49                  ROLA 
+1426 FFD1 BE F0 CC            LDX SVCVO
+1427 FFD4 8C FF FF            CMPX #$FFFF
+1428 FFD7 27 0F               BEQ SWI3Z
+1429 FFD9 30 8B               LEAX D,X
+1430 FFDB BC F0 CE            CMPX SVCVL
+1431 FFDE 22 08               BHI SWI3Z
+1432 FFE0 34 10               PSHS X
+1433 FFE2 EC C4               LDD ,U
+1434 FFE4 AE 44               LDX $04,U
+1435 FFE6 6E F1               JMP [,S++]
+1436 FFE8 37 1F              SWI3Z PULU X,DP,B,A,CC
+1437 FFEA EE 42               LDU $02,U
+1438 FFEC 6E 9F F0 C2         JMP [SWI3]
+1439                         *
+1440                         ** 6809 INTERRUPT VECTORS
+1441                         *
+1442 FFF0 FF B2               FDB V1
+1443 FFF2 FF C6               FDB SWI3E
+1444 FFF4 FF B6               FDB V2
+1445 FFF6 FF BA               FDB V3
+1446 FFF8 FF BE               FDB V4
+1447 FFFA FF C2               FDB V5
+1448 FFFC F8 22               FDB START
+1449 FFFE F8 22               FDB START
+1450                          END START
+Program + Init Data = 1639 bytes
+Error count = 0

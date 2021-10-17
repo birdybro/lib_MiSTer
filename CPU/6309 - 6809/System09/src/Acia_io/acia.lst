@@ -1,0 +1,230 @@
+Assembler release DWC_2.0 version 2.11
+May 6, 2004 (c) Motorola (free ware)
+0001                         ***************************************************
+0002                         *
+0003                         * ACIA_IO
+0004                         * Interrupt driven ACIA driver
+0005                         *
+0006                         ***************************************************
+0007                         *
+0008 E000                    IO	EQU	$E000
+0009 DFC0                    RAM	EQU	$DFC0
+0010 F800                    ROM 	EQU	$F800
+0011                         *
+0012                         *
+0013 F800                    MONITOR	EQU	ROM+0
+0014 DFC8                    IRQVEC	EQU	RAM+8
+0015 E008                    ACIACS	EQU	IO+8
+0016 E009                    ACIADA	EQU	IO+9
+0017 0001                    RXFULL	EQU	$01
+0018 0002                    TXEMPTY	EQU	$02
+0019 0080                    RXIENB	EQU	$80
+0020 0020                    TXIENB	EQU	$20
+0021 0080                    ACIRQ	EQU	$80
+0022                         *
+0023 0010                    IFLAG	EQU	$10
+0024                         *
+0025                         *
+0026                         *
+0027 0100                    	ORG	$0100
+0028 0100 16 21 26           START	LBRA	LOOP
+0029 0103 11                 ACMASK	FCB	$11
+0030 0104 00 00              IRQSAV  FDB     0
+0031                         *
+0032                         * Receive Buffer
+0033                         *
+0034 2000                    RXBLEN	EQU	8192
+0035 0106 01 0C              RXIPTR	FDB	RXBUFF
+0036 0108 01 0C              RXOPTR	FDB	RXBUFF
+0037 010A 00 00              RXCNT	FDB	0
+0038 010C                    RXBUFF	RMB	RXBLEN
+0039                         *
+0040                         * Transmit Buffer
+0041                         *
+0042 0010                    TXBLEN	EQU	16
+0043 210C 21 12              TXIPTR	FDB	TXBUFF
+0044 210E 21 12              TXOPTR	FDB	TXBUFF
+0045 2110 00 00              TXCNT	FDB	0
+0046 2112                    TXBUFF	RMB	TXBLEN
+0047                         *
+0048                         * Initialize ACIA Driver
+0049                         *
+0050 2122                    ACINIT	EQU	*
+0051 2122 34 12              	PSHS	A,X
+0052 2124 1A 10              	ORCC	#IFLAG
+0053 2126 BE DF C8                   LDX     IRQVEC
+0054 2129 BF 01 04                   STX     IRQSAV
+0055 212C 8E 21 C8           	LDX	#ACIJMP
+0056 212F BF DF C8           	STX	IRQVEC
+0057                         *
+0058 2132 8E 01 0C           	LDX	#RXBUFF
+0059 2135 BF 01 06           	STX	RXIPTR
+0060 2138 BF 01 08           	STX	RXOPTR
+0061 213B 8E 00 00                   LDX     #$0000
+0062 213E BF 01 0A           	STX	RXCNT
+0063                         *
+0064 2141 8E 21 12           	LDX	#TXBUFF
+0065 2144 BF 21 0C           	STX	TXIPTR
+0066 2147 BF 21 0E           	STX	TXOPTR
+0067 214A 8E 00 00                   LDX     #$0000
+0068 214D BF 21 10           	STX	TXCNT
+0069                         *
+0070 2150 86 03              	LDA	#$03	; reset ACIA
+0071 2152 B7 E0 08           	STA	ACIACS
+0072 2155 B6 01 03           	LDA	ACMASK
+0073 2158 B7 E0 08           	STA	ACIACS
+0074 215B B6 E0 09           	LDA	ACIADA
+0075                         *
+0076 215E B6 01 03           	LDA	ACMASK	; Enable RX Interrupts
+0077 2161 8A 80              	ORA	#RXIENB
+0078 2163 B7 01 03           	STA	ACMASK
+0079 2166 B7 E0 08           	STA	ACIACS
+0080                         *
+0081 2169 1C EF              	ANDCC	#$FF-IFLAG
+0082 216B 35 92              	PULS	A,X,PC
+0083                         *
+0084                         *
+0085                         * ACIA INTERRUPT
+0086                         *
+0087                         *
+0088                         * Get Character from RX buffer
+0089                         * Entry: None
+0090                         * Exit:  Z=1 if buffer empty 
+0091                         * 	 ACCA = Character
+0092                         *
+0093 216D 34 14              RXGETC	PSHS	B,X	; Save registers
+0094 216F 1A 10              	ORCC	#IFLAG	; Mask ACIA IRQs
+0095                         *
+0096 2171 BE 01 0A           	LDX	RXCNT	; Anything in buffer ?
+0097 2174 27 15              	BEQ	RXGETC2	; No, exit with Z flag set
+0098 2176 30 1F              	LEAX    -1,X	; One less character in buffer
+0099 2178 BF 01 0A           	STX	RXCNT
+0100                         *
+0101 217B BE 01 08           	LDX	RXOPTR	; Point to next byte in buffer
+0102 217E A6 80              	LDA	,X+	; fetch it
+0103 2180 8C 21 0C           	CMPX	#RXBUFF+RXBLEN	; Reached end of buffer ?
+0104 2183 26 03              	BNE	RXGETC1	; No, store pointer
+0105 2185 8E 01 0C           	LDX	#RXBUFF	; Yes, wrap to start of buffer
+0106 2188 BF 01 08           RXGETC1	STX	RXOPTR	; Update pointer
+0107                         *
+0108 218B 1C EF              RXGETC2	ANDCC	#$FF-IFLAG ; Enable interrupts
+0109 218D 35 94              	PULS	B,X,PC	; restore registers and return
+0110                         *
+0111                         * Put Character in TX buffer
+0112                         * Entry: ACCA = Character
+0113                         * Exit:  Z=1 if buffer full
+0114                         *
+0115 218F 34 14              TXPUTC	PSHS	B,X	; Save registers
+0116 2191 1A 10              	ORCC	#IFLAG	; Mask ACIA IRQs
+0117                         *
+0118 2193 F6 01 03           	LDB	ACMASK	; Test if TX interrupt enabled
+0119 2196 C5 20              	BITB	#TXIENB
+0120 2198 26 0D              	BNE	TXPUTC1	; Yes, put character in output buffer
+0121 219A CA 20              	ORB	#TXIENB	; no, Enable TX interrupt
+0122 219C F7 01 03           	STB	ACMASK
+0123 219F F7 E0 08           	STB	ACIACS
+0124 21A2 B7 E0 09           	STA	ACIADA	; output character directly to ACIA
+0125 21A5 20 1D              	BRA	TXPUTC3	; exit
+0126                         *
+0127 21A7 BE 21 10           TXPUTC1	LDX	TXCNT	; Test if buffer full
+0128 21AA 8C 00 10           	CMPX	#TXBLEN
+0129 21AD 27 15              	BEQ	TXPUTC3	; Buffer full, exit with Carry set
+0130 21AF 30 01              	LEAX    1,X	; Buffer not full, bump byte count
+0131 21B1 BF 21 10           	STX	TXCNT
+0132                         *
+0133 21B4 BE 21 0C           	LDX	TXIPTR	; Pointer to buffer input
+0134 21B7 A7 80              	STA	,X+	; Store charcater in buffer
+0135 21B9 8C 21 22           	CMPX	#TXBUFF+TXBLEN ; Need to wrap buffer pointer ?
+0136 21BC 26 03              	BNE	TXPUTC2	; no, update pointer
+0137 21BE 8E 21 12           	LDX	#TXBUFF	; yes, point to start of buffer
+0138 21C1 BF 21 0C           TXPUTC2	STX	TXIPTR
+0139 21C4 1C EF              TXPUTC3	ANDCC	#$FF-IFLAG ; Clear interrupt mask
+0140 21C6 35 94              	PULS	B,X,PC	; restore registers and exit
+0141                         *
+0142                         * ACIA Interrupt service routine
+0143                         *
+0144 21C8                    ACIJMP	EQU	*
+0145 21C8 B6 E0 08           	LDA	ACIACS	; Fetch ACIA status
+0146 21CB 85 AC              	BITA	#$ACIRQ ; Interrupt from ACIA ?
+0147 21CD 27 08              	BEQ	ACIJMPX ; no, exit
+0148                         *
+0149 21CF 85 01              	BITA	#RXFULL ; receive interrupts ?
+0150 21D1 26 05              	BNE	ACIJRX	; yes, go service
+0151 21D3 85 02              ACIJMP1	BITA	#TXEMPTY ; transmit interrupt ?
+0152 21D5 26 26              	BNE	ACIJTX	; yes, go service
+0153                         *
+0154 21D7 3B                 ACIJMPX	RTI		; return from interrupt
+0155                         *
+0156                         * Character Receiver, put in RX input buffer
+0157                         *
+0158 21D8 B6 E0 09           ACIJRX	LDA	ACIADA	; Get character from ACIA
+0159                         *
+0160 21DB BE 01 0A           	LDX	RXCNT
+0161 21DE 8C 20 00           	CMPX	#RXBLEN	; Is input buffer full ?
+0162 21E1 27 15              	BEQ	ACIJRX2	; yes, test for TX interrupt before exiting
+0163 21E3 30 01              	LEAX    1,X
+0164 21E5 BF 01 0A           	STX	RXCNT	; Update Buffer byte count
+0165                         *
+0166 21E8 BE 01 06           	LDX	RXIPTR	; Point to RX input pionter
+0167 21EB A7 80              	STA	,X+	; Store character in buffer
+0168 21ED 8C 21 0C           	CMPX	#RXBUFF+RXBLEN ; Reached end of buffer
+0169 21F0 26 03              	BNE	ACIJRX1 ; no, update pointer
+0170 21F2 8E 01 0C           	LDX	#RXBUFF ; yes, wrap around to start of buffer
+0171 21F5 BF 01 06           ACIJRX1	STX	RXIPTR
+0172                         *
+0173 21F8 B6 E0 08           ACIJRX2 LDA	ACIACS	; Fetch ACIA status
+0174 21FB 20 D6              	BRA	ACIJMP1	; test for TX interrupt before exiting
+0175                         *
+0176                         * Character Transmitter, get next from buffer
+0177                         *
+0178 21FD BE 21 10           ACIJTX	LDX	TXCNT	; Any more characters to output ?
+0179 2200 26 0D              	BNE	ACIJTX1	; yes, fetch from tx buffer
+0180                         *
+0181 2202 F6 01 03           	LDB	ACMASK	; No, mask TX interrupt
+0182 2205 C4 DF              	ANDB	#$FF-TXIENB
+0183 2207 F7 01 03           	STB	ACMASK
+0184 220A F7 E0 08           	STB	ACIACS
+0185 220D 20 C8              	BRA	ACIJMPX	; Exit interrupt routine
+0186                         *
+0187 220F 30 1F              ACIJTX1 LEAX    -1,X 
+0188 2211 BF 21 10           	STX	TXCNT	; One less character in buffer
+0189                         *
+0190 2214 BE 21 0E           	LDX	TXOPTR	; Point to next output character
+0191 2217 A6 80              	LDA	,X+	; fetch byte
+0192 2219 8C 21 22           	CMPX	#TXBUFF+TXBLEN	; Reached end of buffer ?
+0193 221C 26 03              	BNE	ACIJTX2	; no, update pointer
+0194 221E 8E 21 12           	LDX	#TXBUFF	; yes, wrap to start of buffer
+0195 2221 BF 21 0E           ACIJTX2	STX	TXOPTR	; Store pointer
+0196                         *
+0197 2224 B7 E0 09           	STA	ACIADA	; Ouput Character to ACIA
+0198 2227 20 AE              	BRA	ACIJMPX	; return from interrupt
+0199                         *
+0200                         * Main line loop
+0201                         *
+0202 2229 17 FE F6           LOOP	LBSR	ACINIT	; Initialise ACIA and Buffers
+0203 222C 17 FF 3E           LOOP1	LBSR	RXGETC	; Get character
+0204 222F 27 FB              	BEQ	LOOP1
+0205 2231 81 1A              	CMPA	#$1A    ; Ctrl Z exits
+0206 2233 27 05              	BEQ	EXIT
+0207 2235 17 FF 57           	LBSR	TXPUTC	; Echo character
+0208 2238 20 F2                      BRA     LOOP1
+0209                         *
+0210                         * Disable ACIA interrupts
+0211                         *
+0212 223A 1A 10              EXIT    ORCC    #IFLAG
+0213 223C B6 01 03           	LDA	ACMASK	; Enable RX Interrupts
+0214 223F 84 5F              	ANDA	#$FF-RXIENB-TXIENB
+0215 2241 B7 01 03           	STA	ACMASK
+0216 2244 B7 E0 08           	STA	ACIACS
+0217                         *
+0218                         * Restore IRQ vector
+0219                         *
+0220 2247 BE 01 04                   LDX     IRQSAV
+0221 224A BF DF C8                   STX     IRQVEC
+0222 224D 1C EF                      ANDCC   #$FF-IFLAG
+0223 224F 6E 9F F8 00        	JMP	[MONITOR]
+0224                         *
+0225                                 END
+0226                         
+Program + Init Data = 323 bytes
+Error count = 0

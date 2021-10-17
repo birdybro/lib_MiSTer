@@ -1,0 +1,193 @@
+Assembler release DWC_2.0 version 2.11
+May 6, 2004 (c) Motorola (free ware)
+0001                         *
+0002                         ** FLEX 9 COMPACT FLASH DISK DRIVERS
+0003                         *
+0004                         * FOR SYS09BUG 1.2 ON THE BURCHED B5-X300
+0005                         * WITH I/O MAPPED AT $XE000
+0006                         * AND ROM MAPPED AT $XF000
+0007                         * THE BURCHED B5-X300 HAS 256KBYTES OF SRAM
+0008                         * THE FIRST 64K IS USED BY FLEX,
+0009                         * THE SECOND 192K MAY BE USED AS A RAM DISK
+0010                         *
+0011                         *
+0012 0010                    IMASK  EQU $10     IRQ MASK CC
+0013 0040                    FMASK  EQU $40     FIRQ MASK CC
+0014 FFF0                    DATREG EQU $FFF0   DAT REGISTERS
+0015                         *
+0016 E040                    CF_BASE    EQU $E040
+0017 E040                    CF_DATA    EQU CF_BASE+0
+0018 E041                    CF_ERROR   EQU CF_BASE+1 ; read error
+0019 E041                    CF_FEATURE EQU CF_BASE+1 ; write feature
+0020 E042                    CF_SECCNT  EQU CF_BASE+2
+0021 E043                    CF_SECNUM  EQU CF_BASE+3
+0022 E044                    CF_CYLLO   EQU CF_BASE+4
+0023 E045                    CF_CYLHI   EQU CF_BASE+5
+0024 E046                    CF_HEAD    EQU CF_BASE+6
+0025 E047                    CF_STATUS  EQU CF_BASE+7 ; read status
+0026 E047                    CF_COMAND  EQU CF_BASE+7 ; write command
+0027                         *
+0028                         * Command Equates
+0029                         *
+0030 0020                    CMDREAD    EQU $20 ; Read Single sector
+0031 0030                    CMDWRITE   EQU $30 ; Write Single sector
+0032 00EF                    CMDFEATURE EQU $EF
+0033 0001                    FEAT8BIT   EQU $01 ; enable 8 bit transfers
+0034 00E0                    HEADLBA    EQU $E0
+0035                         *
+0036                         * Status bit equates
+0037                         *
+0038 0080                    BSY        EQU $80
+0039 0040                    DRDY       EQU $40
+0040 0008                    DRQ        EQU $08
+0041 0001                    ERR        EQU $01
+0042 DE00                           ORG   $DE00
+0043                         *  
+0044                         * DISK DRIVER JUMP TABLE
+0045                         *
+0046 DE00 7E DE 4B           READ   JMP   READSC
+0047 DE03 7E DE 6C           WRITE  JMP   WRITSC
+0048 DE06 7E DE 8E           VERIFY JMP   BUSY
+0049 DE09 7E DE 32           RESTOR JMP   RESTR1
+0050 DE0C 7E DE 90           DRIVE  JMP   DRVSEL
+0051 DE0F 7E DE 9C           DRVRDY JMP   CHKDRV
+0052 DE12 7E DE 9C           QUICK  JMP   CHKDRV
+0053 DE15 7E DE 1F           COLDDR JMP   INITDR
+0054 DE18 7E DE 4A           WARMDR JMP   WARMD1
+0055 DE1B 7E DE 37           SEEK   JMP   SEEKTS
+0056                         *
+0057                         * RAM SPACE
+0058                         *
+0059 DE1E 00                 DRVNUM FCB   0  
+0060                         *
+0061                         *
+0062                         * INITIALIZE CF CARD FOR 8 BIT LBA MODE
+0063                         *
+0064 DE1F 8D 7F              INITDR BSR WAITRDY
+0065 DE21 86 E0                     LDA  #HEADLBA
+0066 DE23 B7 E0 46                  STA  CF_HEAD
+0067 DE26 86 01                     LDA #FEAT8BIT
+0068 DE28 B7 E0 41                  STA CF_FEATURE
+0069 DE2B 86 EF                     LDA #CMDFEATURE
+0070 DE2D B7 E0 47                  STA CF_COMAND
+0071 DE30 20 6E                     BRA WAITRDY
+0072                         *  
+0073                         * RESTORE DISK DRIVER (SEEK TRACK 00)
+0074                         *  
+0075 DE32 8D 5C              RESTR1 BSR   DRVSEL
+0076 DE34 4F                        CLRA           ; Track 0
+0077 DE35 C6 01                     LDB   #$01     ; Sector 1
+0078                         *
+0079                         * Seek track and sector
+0080                         * A holds track number (0 - ??)
+0081                         * B holds sector number (1 - ??)
+0082                         * Sector numbers starts from 1
+0083                         * subtract 1 to start from sector 0 on CF
+0084                         *
+0085 DE37 5A                 SEEKTS DECB
+0086 DE38 F7 E0 43                  STB  CF_SECNUM
+0087 DE3B B7 E0 44                  STA  CF_CYLLO
+0088 DE3E F6 DE 1E                  LDB  DRVNUM
+0089 DE41 F7 E0 45                  STB  CF_CYLHI
+0090 DE44 C6 01                     LDB  #$01
+0091 DE46 F7 E0 42                  STB  CF_SECCNT
+0092 DE49 5F                        CLRB
+0093 DE4A 39                 WARMD1 RTS
+0094                         *
+0095                         * READ SECTORS FROM CF
+0096                         *
+0097                         *
+0098 DE4B 8D EA              READSC BSR  SEEKTS
+0099 DE4D 86 20                     LDA  #CMDREAD ; IDE READ MULTIPLE
+0100 DE4F B7 E0 47                  STA  CF_COMAND
+0101 DE52 8D 4C                     BSR  WAITRDY
+0102                         *
+0103                         * READ LOOP
+0104                         *
+0105 DE54 5F                        CLRB
+0106 DE55 8D 58              RDLP1  BSR  WAITDRQ
+0107 DE57 B6 E0 40                  LDA  CF_DATA
+0108 DE5A A7 80                     STA  ,X+
+0109 DE5C 5A                        DECB
+0110 DE5D 26 F6                     BNE  RDLP1
+0111                         *
+0112 DE5F 5F                        CLRB
+0113 DE60 8D 4D              RDLP2  BSR  WAITDRQ
+0114 DE62 B6 E0 40                  LDA  CF_DATA
+0115 DE65 5A                        DECB
+0116 DE66 26 F8                     BNE  RDLP2
+0117                         *
+0118 DE68 8D 36                     BSR  WAITRDY
+0119 DE6A 5F                        CLRB
+0120 DE6B 39                        RTS
+0121                         *  
+0122                         * WRITE SECTOR TO CF
+0123                         *  
+0124 DE6C 8D C9              WRITSC BSR  SEEKTS   ; SEEK TRACK & SECTOR
+0125 DE6E 86 30                     LDA  #CMDWRITE; IDE WRITE MULTIPLE
+0126 DE70 B7 E0 47                  STA  CF_COMAND
+0127 DE73 8D 2B                     BSR  WAITRDY
+0128                         *
+0129                         * WRITE LOOP
+0130                         *
+0131 DE75 5F                        CLRB
+0132 DE76 8D 37              WRTLP1 BSR  WAITDRQ
+0133 DE78 A6 80                     LDA  ,X+
+0134 DE7A B7 E0 40                  STA  CF_DATA
+0135 DE7D 5A                        DECB
+0136 DE7E 26 F6                     BNE  WRTLP1
+0137                         *
+0138 DE80 5F                        CLRB
+0139 DE81 8D 2C              WRTLP2 BSR  WAITDRQ
+0140 DE83 4F                        CLRA
+0141 DE84 B7 E0 40                  STA  CF_DATA
+0142 DE87 5A                        DECB
+0143 DE88 26 F7                     BNE WRTLP2
+0144                         *
+0145 DE8A 8D 14                     BSR  WAITRDY
+0146 DE8C 5F                        CLRB
+0147 DE8D 39                        RTS
+0148                         *  
+0149                         * CHECK FOR BUSY  
+0150                         * Doubles as VERIFY
+0151                         *  
+0152 DE8E 5F                 BUSY   CLRB            Never busy
+0153 DE8F 39                        RTS
+0154                         *  
+0155                         * DRIVE SELECT DISK DRIVER
+0156                         *  
+0157 DE90 A6 03              DRVSEL LDA   3,X       GET DRIVE # FROM FCB
+0158 DE92 81 03                     CMPA  #3  
+0159 DE94 23 01                     BLS   DRVS2     IF > 3, SET IT TO 0  
+0160 DE96 4F                        CLRA  
+0161 DE97 B7 DE 1E           DRVS2  STA   DRVNUM
+0162 DE9A 5F                        CLRB            ; SET Z, CLEAR C
+0163 DE9B 39                        RTS
+0164                         *  
+0165                         * CHECK DRIVE READY DISK DRIVER
+0166                         *  
+0167 DE9C A6 03              CHKDRV LDA  3,X
+0168 DE9E 5F                        CLRB             ; CLEAR C, SET Z
+0169 DE9F 39                        RTS  
+0170                         *
+0171                         * WAIT UNTIL READY
+0172                         *
+0173 DEA0 B6 E0 47           WAITRDY LDA  CF_STATUS
+0174 DEA3 85 80                      BITA #BSY
+0175 DEA5 26 F9                      BNE  WAITRDY
+0176 DEA7 B6 E0 47                   LDA  CF_STATUS
+0177 DEAA 85 40                      BITA #DRDY
+0178 DEAC 27 F2                      BEQ  WAITRDY
+0179 DEAE 39                         RTS
+0180                         *
+0181                         * WAIT FOR DATA REQUEST
+0182                         *
+0183 DEAF B6 E0 47           WAITDRQ LDA  CF_STATUS
+0184 DEB2 85 08                      BITA #DRQ
+0185 DEB4 27 F9                      BEQ  WAITDRQ
+0186 DEB6 39                         RTS
+0187                         *
+0188                                 END
+0189                         
+Program + Init Data = 183 bytes
+Error count = 0

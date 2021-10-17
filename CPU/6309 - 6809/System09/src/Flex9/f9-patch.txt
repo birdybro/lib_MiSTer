@@ -1,0 +1,96 @@
+*               *
+**************************
+* Main Flex entry points *
+*************************
+*
+* Read sector routine.
+* Entry: (X) = address where sector is to be placed.
+*        (A) = Track  number.
+*        (B) = Sector number.
+* Exit:  (B) = Error code  (z)=1 if no error.
+READ  JMP  [REAVEC]
+*
+* Write track routine.
+* Entry: (X) = Address of area of memory from which the data will be taken.
+*        (A) = Track number.
+*        (B) = Sector number.
+* Exit:  (B) = Error condition, (Z)=1 no an error.
+WRITE  JMP  [WRIVEC]
+*
+* Verify sector routine.
+* Entry: no parameters.
+* Exit:  (B) = Error condition (Z)=1 if no error.
+VERIFY  JMP  [VERVEC]
+*
+* Restore drive to track 00.
+* Entry: (X) = FCB address (3,X contains drive number).
+* Exit:  (B) = Error condition, (Z)=1 if no error.
+RST  BSR  DRV Select drive first.
+  BEQ  RST1
+  RTS
+RST1  JMP  [RSTVEC]
+*
+* Select current drive.
+* Entry: (X) = FCB address (3,X contains drive number).
+* Exit:  (B) = Error condition, (Z)=0 and (c)=1 if error.
+*        (B) = $0F if non existant drive.
+DRV  PSHS  X,Y
+  LDB  3,X  Get driver type.
+  STB  DRIVE
+  LDX  #DDSTAB
+  LDA  B,X
+  CMPA  #$FF  Is the drive nonexistant?
+  BNE  DRIVE1
+  PULS  X,Y
+  LDB  #$0F
+  TSTB
+  ORCC  #$01
+  RTS
+DRIVE1  LDB  #20  Get correct table start address.
+  MUL
+  LDX  #TABSRT
+  LEAX  D,X
+  LDY  #REAVEC Copy table into ram.
+  LDB  #20
+DRIVE2  LDA  0,X+
+  STA  0,Y+
+  DECB
+  BNE  DRIVE2
+  PULS  X,Y
+  JMP  [DRVVEC]
+*
+* Check for drive ready.
+* Entry: (X) = FCB address (3,X contains drive number)>
+* Exit:  (B) = Error condition, (Z)=0 AND (C)=1 if drive is not ready.
+CHKRDY  JMP  [CHKVEC]
+*
+* Quick drive ready check.
+* Entry: (X) = FCB address (3,X contains drive number).
+* Exit:  (B) = Error condition, (Z)=0 AND (c)=1 if drive not ready.
+QUICK  JMP  [QUIVEC]
+*
+* Init (cold start).
+* Entry: no parameters.
+* Exit: no change.
+DINIT  CLRA
+DINIT1  STA  DRIVE  Init each valid drive in turn.
+  LDX  #DRIVE-3
+  BSR  DRV
+  BCS  DINIT2
+  JSR  [INIVEC]
+DINIT2  LDA  DRIVE
+  INCA
+  CMPA  #4
+  BNE  DINIT1
+  RTS
+*
+* Warm start.
+* Entry: no parameters.
+* Exit: no change.
+WARM  JMP  [WARVEC]
+*
+* Seek track.
+* Entry: (A) = Track number.
+*        (B) = Sector number.
+* Exit:  (B) = Error condition, (Z)=1 if no error.
+SEEK  JMP  [SEEVEC]
