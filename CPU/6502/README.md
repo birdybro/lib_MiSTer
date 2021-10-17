@@ -4,8 +4,6 @@ Here are the 6502 cores used throughout the various MiSTer Cores
 
 ## Where used in MiSTer FPGA
 
-### Arcade Systems
-
 [Arcade - Asteroids](https://github.com/MiSTer-devel/Arcade-Asteroids_MiSTer)<br/>
 [Arcade - Asteroids Deluxe](https://github.com/MiSTer-devel/Arcade-AsteroidsDeluxe_MiSTer)<br/>
 [Arcade - A Tetris](https://github.com/MiSTer-devel/Arcade-ATetris_MiSTer) T65<br/>
